@@ -37,7 +37,7 @@ As capturas são salvas em `Imagens/Kadro` por padrão. Dá para trocar a pasta 
 
 ## Instalar (versão de teste)
 
-Os instaladores são gerados automaticamente a cada mudança, na aba **Actions** do GitHub (artefatos `kadro-macos-apple-silicon`, `kadro-macos-intel` e `kadro-windows-x64`).
+Os instaladores são gerados automaticamente a cada mudança, na aba **Actions** do GitHub (artefatos `kadro-macos-apple-silicon` e `kadro-windows-x64`). Macs com processador Intel não são suportados.
 
 **macOS:** o app ainda não tem assinatura da Apple, então o Mac bloqueia na primeira vez. Arraste o Kadro para **Aplicativos** e rode no Terminal:
 
