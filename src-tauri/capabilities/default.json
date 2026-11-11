@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "overlay",
+  "description": "Permissions for the capture overlays and the preferences window",
+  "windows": [
+    "overlay-*",
+    "settings"
+  ],
+  "permissions": [
+    "core:default",
+    "core:window:allow-show",
+    "core:window:allow-set-focus"
+  ]
+}

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Preferências do Kadro</title>
+    <link rel="stylesheet" href="/src/settings.css" />
+  </head>
+  <body>
+    <main>
+      <section>
+        <h2>Atalhos</h2>
+        <div class="row">
+          <span class="label">Capturar área</span>
+          <button class="shortcut" data-kind="area" title="Clique e pressione a nova combinação"></button>
+          <button class="reset" data-reset="area" title="Voltar ao padrão">↺</button>
+        </div>
+        <div class="row">
+          <span class="label">Capturar tela inteira</span>
+          <button class="shortcut" data-kind="full" title="Clique e pressione a nova combinação"></button>
+          <button class="reset" data-reset="full" title="Voltar ao padrão">↺</button>
+        </div>
+        <p id="status" class="hint">Clique num atalho e pressione a nova combinação. <kbd>Esc</kbd> cancela.</p>
+      </section>
+      <section>
+        <h2>Capturas</h2>
+        <div class="row">
+          <span class="label">Pasta</span>
+          <span id="dir" class="path"></span>
+          <button id="choose-dir" class="secondary">Alterar…</button>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="/src/settings.ts"></script>
+  </body>
+</html>

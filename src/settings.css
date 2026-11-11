@@ -1,0 +1,105 @@
+:root {
+  --bg: #f5f5f7;
+  --card: #ffffff;
+  --fg: #1d1d1f;
+  --muted: #6e6e73;
+  --border: #d2d2d7;
+  --accent: #7c5cf5;
+  --error: #d70015;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1e1e20;
+    --card: #2a2a2d;
+    --fg: #f5f5f7;
+    --muted: #a1a1a6;
+    --border: #3d3d41;
+    --error: #ff6961;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+main { padding: 20px; display: grid; gap: 18px; }
+
+h2 {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+section {
+  padding: 6px 14px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+}
+section h2 { margin: 8px 0 4px; }
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+}
+.row + .row { border-top: 1px solid var(--border); }
+.label { flex: 1; }
+
+button {
+  font: inherit;
+  color: inherit;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  padding: 5px 10px;
+  cursor: pointer;
+}
+button:hover { border-color: var(--muted); }
+
+.shortcut {
+  min-width: 150px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+.shortcut.recording {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
+  color: var(--accent);
+}
+.reset { width: 30px; padding: 5px 0; }
+
+.path {
+  flex: 3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  direction: rtl;
+  text-align: left;
+}
+
+.hint { margin: 8px 0 2px; color: var(--muted); font-size: 12px; }
+.hint.error { color: var(--error); }
+.hint.ok { color: var(--accent); }
+
+kbd {
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font: inherit;
+  font-size: 11px;
+}
