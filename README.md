@@ -4,7 +4,18 @@ Captura de tela simples e rápida para macOS e Windows, inspirada no Lightshot e
 
 Feito com [Tauri 2](https://v2.tauri.app) (Rust + TypeScript), para ser leve: o instalador fica na casa de poucos MB.
 
-## O que já faz
+## Download
+
+Baixe a versão mais recente na página de [Releases](https://github.com/IvanFreitasMaeda/kadro/releases/latest):
+
+| Sistema | Download |
+| --- | --- |
+| macOS com Apple Silicon (M1 ou mais novo), macOS 12.3+ | [Kadro-macOS-AppleSilicon.dmg](https://github.com/IvanFreitasMaeda/kadro/releases/latest/download/Kadro-macOS-AppleSilicon.dmg) |
+| Windows 10 (versão 2004+) ou 11 | [Kadro-Windows-Setup.exe](https://github.com/IvanFreitasMaeda/kadro/releases/latest/download/Kadro-Windows-Setup.exe) · [.msi](https://github.com/IvanFreitasMaeda/kadro/releases/latest/download/Kadro-Windows.msi) |
+
+Macs com processador Intel não são suportados. Depois de baixar, veja [Instalar no macOS](#instalar-no-macos) ou [Instalar no Windows](#instalar-no-windows): no Mac são dois comandos no Terminal, porque o app não tem assinatura da Apple.
+
+## O que faz
 
 - Fica na barra de menus (macOS) ou na bandeja (Windows).
 - **Um clique** no ícone abre a captura. Clique direito mostra o menu.
@@ -69,21 +80,48 @@ No histórico:
 
 O histórico guarda as últimas 30 capturas por padrão (dá para mudar ou desativar em **Preferências…**). Elas ficam na pasta de dados do app, separadas da pasta de capturas: remover do histórico não apaga o que você salvou. As gravações não são duplicadas: o histórico só aponta para o arquivo na pasta de capturas.
 
-## Instalar (versão de teste)
+## Instalar no macOS
 
-Os instaladores são gerados automaticamente a cada mudança, na aba **Actions** do GitHub (artefatos `kadro-macos-apple-silicon` e `kadro-windows-x64`). Macs com processador Intel não são suportados. No Mac é preciso o macOS 12.3 ou mais novo; no Windows, o Windows 10 (versão 2004) ou mais novo.
+1. Abra o `Kadro-macOS-AppleSilicon.dmg` e arraste o Kadro para **Aplicativos**.
+2. O app não tem assinatura da Apple, então o Mac bloqueia na primeira vez. Rode no Terminal:
 
-**macOS:** o app ainda não tem assinatura da Apple, então o Mac bloqueia na primeira vez. Arraste o Kadro para **Aplicativos** e rode no Terminal:
+   ```sh
+   xattr -cr /Applications/Kadro.app
+   tccutil reset ScreenCapture io.github.ivanfreitasmaeda.kadro
+   ```
+
+   O primeiro comando tira a "quarentena" do download, que faz o macOS dizer que o app está danificado. O segundo limpa a permissão de gravação de tela de uma versão anterior, se houver.
+3. Abra o Kadro. Ele não abre janela: aparece como um ícone na barra de menus. Se ainda aparecer aviso, vá em **Ajustes do Sistema → Privacidade e Segurança** e clique em **Abrir Mesmo Assim**.
+4. Na primeira captura o macOS pede a permissão de **Gravação de Tela**. Depois de liberar, feche o Kadro pelo menu do ícone e abra de novo.
+
+Enquanto o app não tiver assinatura da Apple, cada versão nova é vista pelo macOS como outro app. Se a permissão aparecer marcada mas a captura não funcionar, rode de novo o `tccutil reset` acima, abra o Kadro e libere outra vez.
+
+## Instalar no Windows
+
+Rode o `Kadro-Windows-Setup.exe` (ou o `.msi`, se preferir). O SmartScreen pode avisar que o app é desconhecido: clique em **Mais informações → Executar assim mesmo**. O Kadro aparece como um ícone na bandeja, perto do relógio.
+
+## Atualizar ou desinstalar
+
+Para instalar uma versão nova do zero, apague a anterior e os dados dela antes. Isso também apaga o histórico e as preferências. As capturas que você salvou na pasta `Imagens/Kadro` **não** são apagadas.
+
+**macOS** (no Terminal):
 
 ```sh
-xattr -cr /Applications/Kadro.app
+osascript -e 'quit app "Kadro"' 2>/dev/null
+rm -rf /Applications/Kadro.app \
+  ~/Library/Application\ Support/io.github.ivanfreitasmaeda.kadro \
+  ~/Library/Caches/io.github.ivanfreitasmaeda.kadro \
+  ~/Library/WebKit/io.github.ivanfreitasmaeda.kadro
+tccutil reset ScreenCapture io.github.ivanfreitasmaeda.kadro
 ```
 
-Se ainda aparecer aviso, vá em **Ajustes do Sistema → Privacidade e Segurança** e clique em **Abrir Mesmo Assim**. O Kadro não abre janela: ele aparece como um ícone na barra de menus. Na primeira captura o macOS pede a permissão de **Gravação de Tela**. Depois de liberar, feche o Kadro pelo menu do ícone e abra de novo.
+Depois é só seguir o [Instalar no macOS](#instalar-no-macos) com o `.dmg` novo.
 
-Enquanto o app não tiver assinatura da Apple, cada versão nova é vista pelo macOS como outro app. Se a permissão aparecer marcada mas a captura não funcionar, rode `tccutil reset ScreenCapture io.github.ivanfreitasmaeda.kadro`, abra o Kadro e libere de novo.
+**Windows:** feche o Kadro pelo menu do ícone e desinstale em **Configurações → Aplicativos → Kadro → Desinstalar**. Depois, para apagar os dados, rode no PowerShell:
 
-**Windows:** o SmartScreen pode avisar que o app é desconhecido. Clique em **Mais informações → Executar assim mesmo**.
+```powershell
+Remove-Item -Recurse -Force "$env:APPDATA\io.github.ivanfreitasmaeda.kadro", "$env:LOCALAPPDATA\io.github.ivanfreitasmaeda.kadro" -ErrorAction SilentlyContinue
+```
 
 ## Desenvolvimento
 
@@ -94,6 +132,8 @@ npm install
 npm run tauri dev     # roda em modo desenvolvimento
 npm run tauri build   # gera o instalador em src-tauri/target/release/bundle
 ```
+
+Para publicar uma versão nova: suba o número da versão em `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` e `package.json`, faça o merge na `main` e crie a tag (`git tag v0.2.0 && git push origin v0.2.0`). O workflow `Release` gera os instaladores do Mac e do Windows e publica a release com eles. A cada PR o workflow `Build` também gera os instaladores, na aba **Actions**, para teste.
 
 Estrutura:
 
@@ -112,13 +152,9 @@ Estrutura:
 - `src/record.ts`: barrinha de controle da gravação.
 - `src/settings.ts`: interface das preferências.
 
-## Próximos passos
+## Créditos
 
-1. ~~Captura de imagem~~
-2. ~~Anotações: lápis, pincel, setas, formas e texto~~
-3. ~~Histórico em galeria na lateral~~
-4. ~~Gravação de tela em MP4 e GIF~~
-5. Instaladores e releases públicas
+A ideia e os testes são do Ivan Freitas Maeda. O desenvolvimento foi feito com a ajuda do [Claude](https://claude.ai), da Anthropic, para agilizar o trabalho.
 
 ## Licença
 
