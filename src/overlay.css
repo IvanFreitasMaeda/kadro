@@ -134,4 +134,26 @@ html, body {
   background: rgba(255, 255, 255, 0.18);
 }
 
+/* Custom tooltips: native ones open below the overlay, which sits above every window. */
+#toolbar button { position: relative; }
+#toolbar button::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--bar-bg);
+  color: var(--bar-fg);
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s 0.25s;
+}
+#toolbar button:hover::after { opacity: 1; }
+#toolbar.tips-below button::after { bottom: auto; top: calc(100% + 8px); }
+#toolbar button:last-child::after { left: auto; right: 0; transform: none; }
+
 [hidden] { display: none !important; }

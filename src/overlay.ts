@@ -87,7 +87,10 @@ function placeToolbar(r: Rect) {
   if (top < 4) top = r.y + r.h - th - gap;
   const left = clamp(r.x + r.w - tw, 4, vw() - tw - 4);
   toolbar.style.left = `${left}px`;
-  toolbar.style.top = `${clamp(top, 4, vh() - th - 4)}px`;
+  const finalTop = clamp(top, 4, vh() - th - 4);
+  toolbar.style.top = `${finalTop}px`;
+  // Not enough room above the toolbar for tooltips: show them below it.
+  toolbar.classList.toggle("tips-below", finalTop < 40);
 }
 
 function normalize(x1: number, y1: number, x2: number, y2: number): Rect {
@@ -223,6 +226,11 @@ function onKeyDown(e: KeyboardEvent) {
 }
 
 async function init() {
+  if (navigator.userAgent.includes("Mac")) {
+    toolbar.querySelectorAll<HTMLElement>("[data-tip]").forEach((b) => {
+      b.dataset.tip = b.dataset.tip!.replace(/Ctrl\+/g, "⌘");
+    });
+  }
   document.addEventListener("pointerdown", onPointerDown);
   document.addEventListener("pointermove", onPointerMove);
   document.addEventListener("pointerup", onPointerUp);
