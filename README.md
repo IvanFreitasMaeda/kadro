@@ -36,7 +36,13 @@ As capturas são salvas em `Imagens/Kadro` por padrão. Dá para trocar a pasta 
 
 Os instaladores são gerados automaticamente a cada mudança, na aba **Actions** do GitHub (artefatos `kadro-macos-apple-silicon`, `kadro-macos-intel` e `kadro-windows-x64`).
 
-**macOS:** o app ainda não é assinado pela Apple. Na primeira vez, abra com clique direito → **Abrir**, ou rode `xattr -cr /Applications/Kadro.app`. Na primeira captura o macOS pede a permissão de **Gravação de Tela** (Ajustes do Sistema → Privacidade e Segurança). Depois de liberar, feche e abra o Kadro de novo.
+**macOS:** o app ainda não tem assinatura da Apple, então o Mac bloqueia na primeira vez. Arraste o Kadro para **Aplicativos** e rode no Terminal:
+
+```sh
+xattr -cr /Applications/Kadro.app
+```
+
+Se ainda aparecer aviso, vá em **Ajustes do Sistema → Privacidade e Segurança** e clique em **Abrir Mesmo Assim**. O Kadro não abre janela: ele aparece como um ícone na barra de menus. Na primeira captura o macOS pede a permissão de **Gravação de Tela**. Depois de liberar, feche o Kadro pelo menu do ícone e abra de novo.
 
 **Windows:** o SmartScreen pode avisar que o app é desconhecido. Clique em **Mais informações → Executar assim mesmo**.
 
