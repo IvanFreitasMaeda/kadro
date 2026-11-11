@@ -1,2 +1,71 @@
-# kadro
-A simple alternative tool for print screen inpired by lightshot and cleanshot
+# Kadro
+
+Captura de tela simples e rápida para macOS e Windows, inspirada no Lightshot e no CleanShot.
+
+Feito com [Tauri 2](https://v2.tauri.app) (Rust + TypeScript), para ser leve: o instalador fica na casa de poucos MB.
+
+## O que já faz
+
+- Fica na barra de menus (macOS) ou na bandeja (Windows).
+- **Um clique** no ícone abre a captura. Clique direito mostra o menu.
+- Selecione uma área arrastando, ou pegue a tela inteira.
+- Ajuste a seleção depois: arraste para mover, use as alças para redimensionar.
+- Copie para a área de transferência ou salve em PNG numa pasta.
+- Funciona com vários monitores.
+
+## Atalhos
+
+| Ação | macOS | Windows |
+| --- | --- | --- |
+| Capturar área | `⌘ ⇧ 2` | `Ctrl Shift 2` |
+| Capturar tela inteira | `⌘ ⇧ 1` | `Ctrl Shift 1` |
+
+Dentro da captura:
+
+| Tecla | Ação |
+| --- | --- |
+| `Enter`, `Ctrl/⌘ C` ou duplo clique | Copiar e fechar |
+| `Ctrl/⌘ S` | Salvar na pasta de capturas |
+| `Ctrl/⌘ Shift S` | Salvar como… |
+| `F` ou `Ctrl/⌘ A` | Selecionar a tela inteira |
+| `Esc` ou clique direito | Cancelar |
+
+As capturas são salvas em `Imagens/Kadro` por padrão. Dá para trocar a pasta no menu do ícone.
+
+## Instalar (versão de teste)
+
+Os instaladores são gerados automaticamente a cada mudança, na aba **Actions** do GitHub (artefatos `kadro-macos-apple-silicon`, `kadro-macos-intel` e `kadro-windows-x64`).
+
+**macOS:** o app ainda não é assinado pela Apple. Na primeira vez, abra com clique direito → **Abrir**, ou rode `xattr -cr /Applications/Kadro.app`. Na primeira captura o macOS pede a permissão de **Gravação de Tela** (Ajustes do Sistema → Privacidade e Segurança). Depois de liberar, feche e abra o Kadro de novo.
+
+**Windows:** o SmartScreen pode avisar que o app é desconhecido. Clique em **Mais informações → Executar assim mesmo**.
+
+## Desenvolvimento
+
+Requisitos: [Node.js 22+](https://nodejs.org), [Rust](https://rustup.rs) e os [pré-requisitos do Tauri](https://v2.tauri.app/start/prerequisites/) do seu sistema.
+
+```sh
+npm install
+npm run tauri dev     # roda em modo desenvolvimento
+npm run tauri build   # gera o instalador em src-tauri/target/release/bundle
+```
+
+Estrutura:
+
+- `src-tauri/src/capture.rs`: captura dos monitores, janelas de seleção, recorte, copiar e salvar.
+- `src-tauri/src/tray.rs`: ícone e menu da bandeja.
+- `src-tauri/src/shortcuts.rs`: atalhos globais.
+- `src-tauri/src/config.rs`: configurações (pasta de capturas).
+- `src/overlay.ts`: interface de seleção.
+
+## Próximos passos
+
+1. ~~Captura de imagem~~
+2. Anotações: lápis, pincel, setas, formas e texto
+3. Histórico em galeria na lateral
+4. Gravação de tela em MP4 e GIF
+5. Instaladores e releases públicas
+
+## Licença
+
+MIT
