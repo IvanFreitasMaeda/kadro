@@ -2,6 +2,7 @@ mod capture;
 mod config;
 #[cfg(target_os = "macos")]
 mod permissions;
+mod settings;
 mod shortcuts;
 mod tray;
 
@@ -25,6 +26,10 @@ pub fn run() {
             capture::save_selection,
             capture::save_selection_as,
             capture::close_capture,
+            settings::get_settings,
+            settings::set_shortcut,
+            settings::pause_shortcuts,
+            settings::choose_save_dir,
         ])
         .setup(|app| {
             // Menu bar app: no Dock icon on macOS.
@@ -34,7 +39,7 @@ pub fn run() {
             let handle = app.handle();
             app.manage(config::ConfigState(Mutex::new(config::load(handle))));
             tray::create(handle)?;
-            shortcuts::register(handle);
+            shortcuts::register_all(handle);
             Ok(())
         })
         .build(tauri::generate_context!())

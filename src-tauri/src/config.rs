@@ -10,6 +10,10 @@ use tauri::{AppHandle, Manager};
 pub struct Config {
     /// Folder where captures are saved. `None` means the default (Pictures/Kadro).
     pub save_dir: Option<PathBuf>,
+    /// Global shortcut for an area capture. `None` means the default.
+    pub shortcut_area: Option<String>,
+    /// Global shortcut for a full-screen capture. `None` means the default.
+    pub shortcut_full: Option<String>,
 }
 
 pub struct ConfigState(pub Mutex<Config>);

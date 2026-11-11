@@ -4,25 +4,41 @@ use tauri::{
     image::Image,
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle,
+    AppHandle, Manager, Wry,
 };
-use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 
-use crate::{capture, config, shortcuts};
+use crate::{
+    capture, config, settings,
+    shortcuts::{self, Kind},
+};
+
+/// Tray menu items whose accelerator label follows the configured shortcuts.
+pub struct TrayItems {
+    area: MenuItem<Wry>,
+    full: MenuItem<Wry>,
+}
 
 pub fn create(app: &AppHandle) -> tauri::Result<()> {
+    let area = MenuItem::with_id(
+        app,
+        "area",
+        "Capturar área",
+        true,
+        Some(shortcuts::current(app, Kind::Area)),
+    )?;
+    let full = MenuItem::with_id(
+        app,
+        "full",
+        "Capturar tela inteira",
+        true,
+        Some(shortcuts::current(app, Kind::Full)),
+    )?;
     let menu = Menu::with_items(
         app,
         &[
-            &MenuItem::with_id(app, "area", "Capturar área", true, Some(shortcuts::AREA))?,
-            &MenuItem::with_id(
-                app,
-                "full",
-                "Capturar tela inteira",
-                true,
-                Some(shortcuts::FULL),
-            )?,
+            &area,
+            &full,
             &PredefinedMenuItem::separator(app)?,
             &MenuItem::with_id(
                 app,
@@ -31,17 +47,12 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
                 true,
                 None::<&str>,
             )?,
-            &MenuItem::with_id(
-                app,
-                "choose_dir",
-                "Escolher pasta de capturas…",
-                true,
-                None::<&str>,
-            )?,
+            &MenuItem::with_id(app, "settings", "Preferências…", true, Some("CmdOrCtrl+,"))?,
             &PredefinedMenuItem::separator(app)?,
             &MenuItem::with_id(app, "quit", "Sair do Kadro", true, None::<&str>)?,
         ],
     )?;
+    app.manage(TrayItems { area, full });
 
     // macOS menu bar icons are monochrome "template" images; elsewhere use the app icon.
     #[cfg(target_os = "macos")]
@@ -63,7 +74,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
             "area" => capture::start(app, false),
             "full" => capture::start(app, true),
             "open_dir" => open_save_dir(app),
-            "choose_dir" => choose_save_dir(app),
+            "settings" => settings::open(app),
             "quit" => app.exit(0),
             _ => {}
         })
@@ -92,18 +103,13 @@ fn open_save_dir(app: &AppHandle) {
     }
 }
 
-fn choose_save_dir(app: &AppHandle) {
-    let current = config::save_dir(app).unwrap_or_else(|_| config::default_save_dir());
-    let handle = app.clone();
-    app.dialog()
-        .file()
-        .set_title("Escolha a pasta onde as capturas serão salvas")
-        .set_directory(current)
-        .pick_folder(move |folder| {
-            if let Some(path) = folder.and_then(|f| f.as_path().map(|p| p.to_path_buf())) {
-                if let Err(err) = config::set_save_dir(&handle, path) {
-                    log::error!("could not save settings: {err}");
-                }
-            }
-        });
+/// Updates the shortcut labels shown in the tray menu.
+pub fn refresh_accelerators(app: &AppHandle) {
+    let items = app.state::<TrayItems>();
+    let _ = items
+        .area
+        .set_accelerator(Some(shortcuts::current(app, Kind::Area)));
+    let _ = items
+        .full
+        .set_accelerator(Some(shortcuts::current(app, Kind::Full)));
 }

@@ -11,6 +11,7 @@ Feito com [Tauri 2](https://v2.tauri.app) (Rust + TypeScript), para ser leve: o 
 - Selecione uma área arrastando, ou pegue a tela inteira.
 - Ajuste a seleção depois: arraste para mover, use as alças para redimensionar.
 - Copie para a área de transferência ou salve em PNG numa pasta.
+- Atalhos e pasta de capturas configuráveis em Preferências.
 - Funciona com vários monitores.
 
 ## Atalhos
@@ -19,6 +20,8 @@ Feito com [Tauri 2](https://v2.tauri.app) (Rust + TypeScript), para ser leve: o 
 | --- | --- | --- |
 | Capturar área | `⌘ ⇧ 2` | `Ctrl Shift 2` |
 | Capturar tela inteira | `⌘ ⇧ 1` | `Ctrl Shift 1` |
+
+Dá para trocar os dois atalhos em **Preferências…**, no menu do ícone: clique no atalho e pressione a nova combinação.
 
 Dentro da captura:
 
@@ -30,7 +33,7 @@ Dentro da captura:
 | `F` ou `Ctrl/⌘ A` | Selecionar a tela inteira |
 | `Esc` ou clique direito | Cancelar |
 
-As capturas são salvas em `Imagens/Kadro` por padrão. Dá para trocar a pasta no menu do ícone.
+As capturas são salvas em `Imagens/Kadro` por padrão. Dá para trocar a pasta em **Preferências…**.
 
 ## Instalar (versão de teste)
 
@@ -62,9 +65,11 @@ Estrutura:
 
 - `src-tauri/src/capture.rs`: captura dos monitores, janelas de seleção, recorte, copiar e salvar.
 - `src-tauri/src/tray.rs`: ícone e menu da bandeja.
-- `src-tauri/src/shortcuts.rs`: atalhos globais.
-- `src-tauri/src/config.rs`: configurações (pasta de capturas).
+- `src-tauri/src/shortcuts.rs`: atalhos globais configuráveis.
+- `src-tauri/src/settings.rs`: janela de preferências.
+- `src-tauri/src/config.rs`: configurações salvas (atalhos e pasta de capturas).
 - `src/overlay.ts`: interface de seleção.
+- `src/settings.ts`: interface das preferências.
 
 ## Próximos passos
 
