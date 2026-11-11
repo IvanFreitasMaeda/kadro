@@ -1,6 +1,6 @@
 // Capture overlay: shows the frozen screenshot of one monitor and lets the user
 // select an area, annotate it, then copy it or save it. One overlay window exists
-// per monitor.
+// per monitor. In recording mode it picks the area and format to record instead.
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
@@ -29,10 +29,18 @@ const MIN_SIZE = 4;
 // Injected by the Rust side when it creates the overlay window.
 declare global {
   interface Window {
-    __KADRO__?: { monitor: number; nonce: number; full: boolean };
+    __KADRO__?: { monitor: number; nonce: number; full: boolean; record?: boolean; format?: Format };
   }
 }
-const { monitor, nonce, full: startFull } = window.__KADRO__ ?? { monitor: 0, nonce: 0, full: false };
+type Format = "mp4" | "gif";
+const {
+  monitor,
+  nonce,
+  full: startFull,
+  record: recordMode = false,
+  format: startFormat = "mp4",
+} = window.__KADRO__ ?? { monitor: 0, nonce: 0, full: false };
+let format: Format = startFormat;
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const shot = $<HTMLImageElement>("shot");
@@ -102,7 +110,7 @@ function render() {
   sizeEl.hidden = !has;
   hint.hidden = has || drag !== null;
   toolbar.hidden = !has || drag !== null;
-  tools.hidden = toolbar.hidden;
+  tools.hidden = toolbar.hidden || recordMode;
   if (tools.hidden) closePopovers();
   drawInk();
   if (!has || !sel) return;
@@ -483,11 +491,34 @@ async function close() {
   await invoke("close_capture");
 }
 
+function setFormat(f: Format) {
+  format = f;
+  toolbar.querySelectorAll<HTMLElement>("[data-format]").forEach((b) => {
+    b.classList.toggle("active", b.dataset.format === f);
+    b.setAttribute("aria-checked", String(b.dataset.format === f));
+  });
+}
+
+async function startRecording() {
+  if (!sel) return;
+  busy = true;
+  try {
+    await invoke("start_recording", { rect: toImageRect(sel), format });
+  } catch (err) {
+    showToast(`Erro: ${err}`);
+    busy = false;
+  }
+}
+
 async function run(action: string) {
   if (busy) return;
   if (action === "close") return close();
   if (action === "full") return selectFullScreen();
   if (!sel) return;
+  if (recordMode) {
+    if (action === "record") await startRecording();
+    return;
+  }
 
   busy = true;
   commitText();
@@ -579,6 +610,17 @@ function onKeyDown(e: KeyboardEvent) {
   } else if (mod && key === "y") {
     e.preventDefault();
     redo();
+  } else if (recordMode) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      void run("record");
+    } else if (key === "f" || (mod && key === "a")) {
+      e.preventDefault();
+      selectFullScreen();
+    } else if (!mod && (key === "v" || key === "g")) {
+      e.preventDefault();
+      setFormat(key === "g" ? "gif" : "mp4");
+    }
   } else if (e.key === "Enter" || (mod && key === "c")) {
     e.preventDefault();
     void run("copy");
@@ -596,6 +638,12 @@ function onKeyDown(e: KeyboardEvent) {
 }
 
 async function init() {
+  if (recordMode) {
+    document.body.classList.add("record");
+    hint.innerHTML =
+      "Arraste para escolher o que gravar · <kbd>F</kbd> tela inteira · <kbd>Esc</kbd> cancelar";
+    setFormat(format);
+  }
   buildPopovers();
   setColor(color);
   setSize(sizeIdx);
@@ -616,13 +664,14 @@ async function init() {
     void close();
   });
   selEl.addEventListener("dblclick", () => {
-    if (!tool) void run("copy");
+    if (!tool) void run(recordMode ? "record" : "copy");
   });
   // Buttons must not take focus away from the text box.
   for (const bar of [toolbar, tools]) bar.addEventListener("mousedown", (e) => e.preventDefault());
   toolbar.addEventListener("click", (e) => {
     const btn = (e.target as HTMLElement).closest("button");
-    if (btn?.dataset.action) void run(btn.dataset.action);
+    if (btn?.dataset.format) setFormat(btn.dataset.format as Format);
+    else if (btn?.dataset.action) void run(btn.dataset.action);
   });
   tools.addEventListener("click", onToolsClick);
   textEdit.addEventListener("keydown", onTextKeyDown);

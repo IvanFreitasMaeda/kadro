@@ -9,7 +9,7 @@ use tauri::{
 use tauri_plugin_opener::OpenerExt;
 
 use crate::{
-    capture, config, gallery, settings,
+    capture, config, gallery, record, settings,
     shortcuts::{self, Kind},
 };
 
@@ -18,7 +18,11 @@ pub struct TrayItems {
     area: MenuItem<Wry>,
     full: MenuItem<Wry>,
     gallery: MenuItem<Wry>,
+    record: MenuItem<Wry>,
 }
+
+const TOOLTIP: &str = "Kadro: clique para capturar";
+const TOOLTIP_RECORDING: &str = "Kadro: gravando. Clique para parar";
 
 pub fn create(app: &AppHandle) -> tauri::Result<()> {
     let area = MenuItem::with_id(
@@ -35,6 +39,13 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         true,
         Some(shortcuts::current(app, Kind::Full)),
     )?;
+    let record = MenuItem::with_id(
+        app,
+        "record",
+        "Gravar tela",
+        true,
+        Some(shortcuts::current(app, Kind::Record)),
+    )?;
     let gallery = MenuItem::with_id(
         app,
         "gallery",
@@ -47,6 +58,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         &[
             &area,
             &full,
+            &record,
             &PredefinedMenuItem::separator(app)?,
             &gallery,
             &MenuItem::with_id(
@@ -65,6 +77,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         area,
         full,
         gallery,
+        record,
     });
 
     // macOS menu bar icons are monochrome "template" images; elsewhere use the app icon.
@@ -80,12 +93,13 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
     TrayIconBuilder::with_id("kadro")
         .icon(icon)
         .icon_as_template(cfg!(target_os = "macos"))
-        .tooltip("Kadro: clique para capturar")
+        .tooltip(TOOLTIP)
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
             "area" => capture::start(app, false),
             "full" => capture::start(app, true),
+            "record" => record::toggle(app),
             "gallery" => gallery::toggle(app),
             "open_dir" => open_save_dir(app),
             "settings" => settings::open(app),
@@ -99,7 +113,13 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
                 ..
             } = event
             {
-                capture::start(tray.app_handle(), false);
+                // While recording, the icon is the quickest way to stop.
+                let app = tray.app_handle();
+                if record::is_busy(app) {
+                    record::stop(app, false);
+                } else {
+                    capture::start(app, false);
+                }
             }
         })
         .build(app)?;
@@ -129,4 +149,24 @@ pub fn refresh_accelerators(app: &AppHandle) {
     let _ = items
         .gallery
         .set_accelerator(Some(shortcuts::current(app, Kind::Gallery)));
+    let _ = items
+        .record
+        .set_accelerator(Some(shortcuts::current(app, Kind::Record)));
+}
+
+/// Switches the menu and tooltip between "record" and "stop".
+pub fn set_recording(app: &AppHandle, recording: bool) {
+    let items = app.state::<TrayItems>();
+    let _ = items.record.set_text(if recording {
+        "Parar gravação"
+    } else {
+        "Gravar tela"
+    });
+    if let Some(tray) = app.tray_by_id("kadro") {
+        let _ = tray.set_tooltip(Some(if recording {
+            TOOLTIP_RECORDING
+        } else {
+            TOOLTIP
+        }));
+    }
 }

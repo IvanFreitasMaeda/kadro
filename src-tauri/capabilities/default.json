@@ -1,15 +1,17 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "overlay",
-  "description": "Permissions for the capture overlays, the preferences window and the gallery",
+  "description": "Permissions for the capture overlays, the preferences window, the gallery and the recording bar",
   "windows": [
     "overlay-*",
     "settings",
-    "gallery"
+    "gallery",
+    "recorder"
   ],
   "permissions": [
     "core:default",
     "core:window:allow-show",
-    "core:window:allow-set-focus"
+    "core:window:allow-set-focus",
+    "core:window:allow-start-dragging"
   ]
 }

@@ -1,8 +1,10 @@
 //! Recent captures for the side gallery, kept in the app data folder.
 //!
 //! Each capture is stored as two files named after its id, `<millis>-<width>x<height>`:
-//! the full image as PNG and a small JPEG thumbnail. The folder listing is the index,
-//! so there is nothing else to keep in sync.
+//! a small JPEG thumbnail, plus the full image as PNG or, for a recording, a `.rec`
+//! file pointing at the video in the captures folder (videos are too big to keep a
+//! second copy). The folder listing is the index, so there is nothing else to keep
+//! in sync.
 
 use std::{
     fs,
@@ -12,12 +14,12 @@ use std::{
 
 use chrono::{DateTime, Local, TimeZone};
 use image::{codecs::jpeg::JpegEncoder, imageops, DynamicImage, ImageFormat, RgbaImage};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, Runtime, WebviewWindow};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 
-use crate::{capture, config};
+use crate::{capture, config, fileclip, record::Format};
 
 pub const DEFAULT_LIMIT: usize = 30;
 /// Thumbnails fit in this box, enough for the gallery width on a 2x display.
@@ -36,6 +38,28 @@ pub struct Item {
     time: i64,
     width: u32,
     height: u32,
+    /// "image", "mp4" or "gif".
+    kind: &'static str,
+    /// Length of a recording, in milliseconds.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    duration: Option<u64>,
+    /// The recording's file was moved or deleted.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    missing: bool,
+}
+
+/// Contents of a `.rec` file.
+#[derive(Serialize, Deserialize)]
+struct Recording {
+    path: PathBuf,
+    format: Format,
+    duration_ms: u64,
+}
+
+/// What a history item's full content is.
+enum Content {
+    Image(PathBuf),
+    Video(Recording),
 }
 
 fn dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
@@ -68,6 +92,9 @@ fn parse_id(id: &str) -> Option<Item> {
         time: time.parse().ok()?,
         width: w.parse().ok()?,
         height: h.parse().ok()?,
+        kind: "image",
+        duration: None,
+        missing: false,
     })
 }
 
@@ -79,14 +106,54 @@ fn thumb_path(dir: &Path, id: &str) -> PathBuf {
     dir.join(format!("{id}.jpg"))
 }
 
-/// The capture's full image, after checking the id.
-fn image_path(app: &AppHandle, id: &str) -> Result<(Item, PathBuf), String> {
+fn rec_path(dir: &Path, id: &str) -> PathBuf {
+    dir.join(format!("{id}.rec"))
+}
+
+fn read_rec(path: &Path) -> Option<Recording> {
+    serde_json::from_slice(&fs::read(path).ok()?).ok()
+}
+
+/// The capture's full image or video, after checking the id.
+fn content(app: &AppHandle, id: &str) -> Result<(Item, Content), String> {
     let item = parse_id(id).ok_or("captura inválida")?;
-    let path = png_path(&dir(app)?, id);
-    if !path.exists() {
-        return Err("Essa captura não está mais no histórico.".into());
+    let dir = dir(app)?;
+    let png = png_path(&dir, id);
+    if png.exists() {
+        return Ok((item, Content::Image(png)));
     }
-    Ok((item, path))
+    let rec = read_rec(&rec_path(&dir, id)).ok_or("Essa captura não está mais no histórico.")?;
+    if !rec.path.exists() {
+        return Err("O arquivo da gravação foi movido ou apagado.".into());
+    }
+    Ok((item, Content::Video(rec)))
+}
+
+impl Content {
+    fn path(&self) -> &Path {
+        match self {
+            Content::Image(path) => path,
+            Content::Video(rec) => &rec.path,
+        }
+    }
+
+    fn ext(&self) -> &'static str {
+        match self {
+            Content::Image(_) => "png",
+            Content::Video(rec) => rec.format.ext(),
+        }
+    }
+
+    fn filter_name(&self) -> &'static str {
+        match self {
+            Content::Image(_) => "Imagem PNG",
+            Content::Video(Recording {
+                format: Format::Mp4,
+                ..
+            }) => "Vídeo MP4",
+            Content::Video(_) => "GIF animado",
+        }
+    }
 }
 
 /// Every capture in the history, newest first.
@@ -98,16 +165,26 @@ fn items(dir: &Path) -> Vec<Item> {
         .filter_map(|e| e.ok())
         .filter_map(|e| {
             let name = e.file_name();
-            let id = name.to_str()?.strip_suffix(".png")?;
-            parse_id(id)
+            let name = name.to_str()?;
+            if let Some(id) = name.strip_suffix(".png") {
+                return parse_id(id);
+            }
+            let mut item = parse_id(name.strip_suffix(".rec")?)?;
+            let rec = read_rec(&e.path())?;
+            item.kind = rec.format.ext();
+            item.duration = Some(rec.duration_ms);
+            item.missing = !rec.path.exists();
+            Some(item)
         })
         .collect();
     items.sort_by_key(|item| std::cmp::Reverse(item.time));
     items
 }
 
+/// Removes an item from the history. A recording's video stays in the captures folder.
 fn remove(dir: &Path, id: &str) {
     let _ = fs::remove_file(png_path(dir, id));
+    let _ = fs::remove_file(rec_path(dir, id));
     let _ = fs::remove_file(thumb_path(dir, id));
 }
 
@@ -134,30 +211,73 @@ pub fn add(app: &AppHandle, img: RgbaImage) {
 }
 
 fn store(app: &AppHandle, img: &RgbaImage, limit: usize) -> Result<(), String> {
+    let png = capture::encode_png(img, image::codecs::png::CompressionType::Default)?;
+    write_item(app, img, (img.width(), img.height()), limit, |dir, id| {
+        fs::write(png_path(dir, id), png).map_err(|e| e.to_string())
+    })
+}
+
+/// Writes the thumbnail, then the item's main file with `write`, under a new id.
+fn write_item(
+    app: &AppHandle,
+    img: &RgbaImage,
+    (width, height): (u32, u32),
+    limit: usize,
+    write: impl FnOnce(&Path, &str) -> Result<(), String>,
+) -> Result<(), String> {
     let thumb = fit_thumb(img);
     let mut jpeg = Vec::new();
     JpegEncoder::new_with_quality(&mut jpeg, THUMB_QUALITY)
         .encode_image(&thumb)
         .map_err(|e| e.to_string())?;
-    let png = capture::encode_png(img, image::codecs::png::CompressionType::Default)?;
 
     let _guard = LOCK.lock().unwrap();
     let dir = dir(app)?;
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let mut time = Local::now().timestamp_millis();
     let id = loop {
-        let id = format!("{time}-{}x{}", img.width(), img.height());
-        if !png_path(&dir, &id).exists() {
+        let id = format!("{time}-{width}x{height}");
+        if !thumb_path(&dir, &id).exists() {
             break id;
         }
         time += 1;
     };
-    // Thumbnail first: the listing looks for the PNG, so an item only shows up
-    // once both files are there.
+    // Thumbnail first: the listing looks for the main file, so an item only shows
+    // up once both files are there.
     fs::write(thumb_path(&dir, &id), jpeg).map_err(|e| e.to_string())?;
-    fs::write(png_path(&dir, &id), png).map_err(|e| e.to_string())?;
+    write(&dir, &id)?;
     prune(&dir, limit);
     Ok(())
+}
+
+/// Adds a finished recording, with `thumb` (its first frame) as the thumbnail.
+pub fn add_recording(
+    app: &AppHandle,
+    thumb: &RgbaImage,
+    path: &Path,
+    format: Format,
+    size: (u32, u32),
+    duration: std::time::Duration,
+) {
+    let limit = limit(app);
+    if limit == 0 {
+        return;
+    }
+    let rec = Recording {
+        path: path.to_path_buf(),
+        format,
+        duration_ms: duration.as_millis() as u64,
+    };
+    let result = write_item(app, thumb, size, limit, |dir, id| {
+        let json = serde_json::to_vec(&rec).map_err(|e| e.to_string())?;
+        fs::write(rec_path(dir, id), json).map_err(|e| e.to_string())
+    });
+    match result {
+        Ok(()) => {
+            let _ = app.emit(CHANGED, ());
+        }
+        Err(err) => log::error!("could not add the recording to history: {err}"),
+    }
 }
 
 /// Scales the image down to fit in `THUMB_MAX`, keeping its aspect ratio.
@@ -170,6 +290,7 @@ fn fit_thumb(img: &RgbaImage) -> image::RgbImage {
 }
 
 /// Serves `h/<id>.jpg` (thumbnail) or `h/<id>.png` (full image) for the gallery.
+/// Recordings only have the thumbnail.
 pub fn serve<R: Runtime>(app: &AppHandle<R>, name: &str) -> Option<(Vec<u8>, &'static str)> {
     let (id, mime) = if let Some(id) = name.strip_suffix(".jpg") {
         (id, "image/jpeg")
@@ -198,22 +319,34 @@ pub fn history_list(app: AppHandle) -> Vec<Item> {
     dir(&app).map(|d| items(&d)).unwrap_or_default()
 }
 
+/// Copies an image to the clipboard, or a recording as a file (to paste in a chat
+/// or a folder).
 #[tauri::command]
 pub async fn history_copy(app: AppHandle, id: String) -> Result<(), String> {
-    let (_, path) = image_path(&app, &id)?;
-    let bytes = fs::read(&path).map_err(|e| e.to_string())?;
-    let img = image::load_from_memory_with_format(&bytes, ImageFormat::Png)
-        .map_err(|e| e.to_string())?
-        .to_rgba8();
-    capture::copy_to_clipboard(&app, img)
+    match content(&app, &id)?.1 {
+        Content::Image(path) => {
+            let bytes = fs::read(&path).map_err(|e| e.to_string())?;
+            let img = image::load_from_memory_with_format(&bytes, ImageFormat::Png)
+                .map_err(|e| e.to_string())?
+                .to_rgba8();
+            capture::copy_to_clipboard(&app, img)
+        }
+        Content::Video(rec) => fileclip::copy_file(&rec.path),
+    }
 }
 
 /// Copies the capture to the configured folder and returns the new file's path.
+/// Recordings are already saved there, unless the folder changed since.
 #[tauri::command]
 pub async fn history_save(app: AppHandle, id: String) -> Result<String, String> {
-    let (item, src) = image_path(&app, &id)?;
-    let dest = capture::unique_path(&config::save_dir(&app)?, local_time(&item));
-    fs::copy(&src, &dest).map_err(|e| format!("não foi possível salvar: {e}"))?;
+    let (item, content) = content(&app, &id)?;
+    let dir = config::save_dir(&app)?;
+    let src = content.path();
+    if src.parent() == Some(dir.as_path()) {
+        return Ok(src.display().to_string());
+    }
+    let dest = capture::unique_path_ext(&dir, local_time(&item), content.ext());
+    fs::copy(src, &dest).map_err(|e| format!("não foi possível salvar: {e}"))?;
     Ok(dest.display().to_string())
 }
 
@@ -224,35 +357,49 @@ pub async fn history_save_as(
     window: WebviewWindow,
     id: String,
 ) -> Result<Option<String>, String> {
-    let (item, src) = image_path(&app, &id)?;
+    let (item, content) = content(&app, &id)?;
+    let ext = content.ext();
     let dir = config::save_dir(&app).unwrap_or_else(|_| config::default_save_dir());
     let chosen = app
         .dialog()
         .file()
         .set_parent(&window)
-        .set_title("Salvar captura")
+        .set_title(if ext == "png" {
+            "Salvar captura"
+        } else {
+            "Salvar gravação"
+        })
         .set_directory(dir)
-        .set_file_name(capture::file_name(local_time(&item)))
-        .add_filter("Imagem PNG", &["png"])
+        .set_file_name(capture::file_name_ext(local_time(&item), ext))
+        .add_filter(content.filter_name(), &[ext])
         .blocking_save_file();
     let Some(path) = chosen.and_then(|p| p.as_path().map(Path::to_path_buf)) else {
         return Ok(None);
     };
     let path = if path.extension().is_none() {
-        path.with_extension("png")
+        path.with_extension(ext)
     } else {
         path
     };
-    fs::copy(&src, &path).map_err(|e| format!("não foi possível salvar: {e}"))?;
+    fs::copy(content.path(), &path).map_err(|e| format!("não foi possível salvar: {e}"))?;
     Ok(Some(path.display().to_string()))
 }
 
-/// Opens the capture in the system's default image viewer.
+/// Opens the capture in the system's default image viewer or video player.
 #[tauri::command]
 pub fn history_open(app: AppHandle, id: String) -> Result<(), String> {
-    let (_, path) = image_path(&app, &id)?;
+    let (_, content) = content(&app, &id)?;
     app.opener()
-        .open_path(path.to_string_lossy(), None::<&str>)
+        .open_path(content.path().to_string_lossy(), None::<&str>)
+        .map_err(|e| e.to_string())
+}
+
+/// Shows the recording's file in Finder / Explorer.
+#[tauri::command]
+pub fn history_reveal(app: AppHandle, id: String) -> Result<(), String> {
+    let (_, content) = content(&app, &id)?;
+    app.opener()
+        .reveal_item_in_dir(content.path())
         .map_err(|e| e.to_string())
 }
 
@@ -324,6 +471,40 @@ mod tests {
         let ids: Vec<_> = items(&dir).into_iter().map(|i| i.id).collect();
         assert_eq!(ids, ["5-1x1", "4-1x1"]);
         assert!(!thumb_path(&dir, "1-1x1").exists());
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn lists_recordings() {
+        let dir = std::env::temp_dir().join(format!("kadro-history-rec-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let video = dir.join("video.gif");
+        fs::write(&video, b"GIF89a").unwrap();
+        let rec = Recording {
+            path: video.clone(),
+            format: Format::Gif,
+            duration_ms: 4200,
+        };
+        fs::write(
+            rec_path(&dir, "7-640x360"),
+            serde_json::to_vec(&rec).unwrap(),
+        )
+        .unwrap();
+        fs::write(thumb_path(&dir, "7-640x360"), b"").unwrap();
+        fs::write(png_path(&dir, "3-10x10"), b"").unwrap();
+
+        let list = items(&dir);
+        assert_eq!(list.len(), 2);
+        assert_eq!(
+            (list[0].kind, list[0].duration, list[0].missing),
+            ("gif", Some(4200), false)
+        );
+        assert_eq!(list[1].kind, "image");
+
+        fs::remove_file(&video).unwrap();
+        assert!(items(&dir)[0].missing);
+        remove(&dir, "7-640x360");
+        assert_eq!(items(&dir).len(), 1);
         fs::remove_dir_all(&dir).unwrap();
     }
 
