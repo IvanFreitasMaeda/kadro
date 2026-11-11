@@ -70,6 +70,15 @@ button {
 }
 button:hover { border-color: var(--muted); }
 
+select {
+  font: inherit;
+  color: inherit;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  padding: 4px 6px;
+}
+
 .shortcut {
   min-width: 150px;
   font-variant-numeric: tabular-nums;

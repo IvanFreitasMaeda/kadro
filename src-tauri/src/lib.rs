@@ -1,5 +1,7 @@
 mod capture;
 mod config;
+mod gallery;
+mod history;
 #[cfg(target_os = "macos")]
 mod permissions;
 mod settings;
@@ -26,6 +28,15 @@ pub fn run() {
             capture::save_selection,
             capture::save_selection_as,
             capture::close_capture,
+            gallery::close_gallery,
+            history::history_list,
+            history::history_copy,
+            history::history_save,
+            history::history_save_as,
+            history::history_open,
+            history::history_delete,
+            history::history_clear,
+            history::set_history_limit,
             settings::get_settings,
             settings::set_shortcut,
             settings::pause_shortcuts,

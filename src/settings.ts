@@ -1,10 +1,14 @@
-// Preferences window: record global shortcuts and pick the captures folder.
+// Preferences window: record global shortcuts, pick the captures folder and the
+// history size.
 import { invoke } from "@tauri-apps/api/core";
+import { pretty as prettyFor } from "./keys";
 
-type Kind = "area" | "full";
+type Kind = "area" | "full" | "gallery";
 type Settings = {
   shortcut_area: string;
   shortcut_full: string;
+  shortcut_gallery: string;
+  history_limit: number;
   save_dir: string;
   platform: string;
 };
@@ -17,62 +21,11 @@ document.querySelectorAll<HTMLButtonElement>(".shortcut").forEach((b) => {
 });
 
 let isMac = navigator.userAgent.includes("Mac");
+const pretty = (accelerator: string) => prettyFor(accelerator, isMac);
 let recording: Kind | null = null;
-const values: Record<Kind, string> = { area: "", full: "" };
+const values: Record<Kind, string> = { area: "", full: "", gallery: "" };
+const historyEl = document.getElementById("history-limit") as HTMLSelectElement;
 const DEFAULT_HINT = status.innerHTML;
-
-const MAC_SYMBOLS: Record<string, string> = {
-  Control: "⌃",
-  Alt: "⌥",
-  Shift: "⇧",
-  Command: "⌘",
-  Super: "⌘",
-};
-const ORDER = ["Control", "Alt", "Shift", "Command", "Super"];
-
-/** Turns "CommandOrControl+Shift+Digit2" into "⌘ ⇧ 2" (macOS) or "Ctrl + Shift + 2". */
-function pretty(accelerator: string): string {
-  const parts = accelerator.split("+").map((p) => {
-    const lower = p.toLowerCase();
-    if (lower === "commandorcontrol" || lower === "cmdorctrl") return isMac ? "Command" : "Control";
-    if (lower === "cmd" || lower === "command" || lower === "meta") return "Command";
-    if (lower === "ctrl" || lower === "control") return "Control";
-    if (lower === "option" || lower === "alt") return "Alt";
-    if (lower === "shift") return "Shift";
-    if (lower === "super") return "Super";
-    return p;
-  });
-  const mods = ORDER.filter((m) => parts.includes(m));
-  const key = parts.filter((p) => !ORDER.includes(p)).map(prettyKey).join("");
-  if (isMac) return [...mods.map((m) => MAC_SYMBOLS[m]), key].join(" ");
-  const names: Record<string, string> = { Control: "Ctrl", Alt: "Alt", Shift: "Shift", Super: "Win" };
-  return [...mods.map((m) => names[m] ?? m), key].join(" + ");
-}
-
-function prettyKey(code: string): string {
-  const m = /^(?:Key|Digit|Numpad)(.+)$/.exec(code);
-  if (m) return m[1];
-  const names: Record<string, string> = {
-    Space: isMac ? "Espaço" : "Space",
-    ArrowUp: "↑",
-    ArrowDown: "↓",
-    ArrowLeft: "←",
-    ArrowRight: "→",
-    PrintScreen: "Print Screen",
-    Backquote: "`",
-    Minus: "-",
-    Equal: "=",
-    BracketLeft: "[",
-    BracketRight: "]",
-    Backslash: "\\",
-    Semicolon: ";",
-    Quote: "'",
-    Comma: ",",
-    Period: ".",
-    Slash: "/",
-  };
-  return names[code] ?? code;
-}
 
 /** Builds an accelerator from a key press, or null if it isn't a usable shortcut yet. */
 function accelerator(e: KeyboardEvent): string | null {
@@ -167,6 +120,18 @@ document.getElementById("choose-dir")!.addEventListener("click", async () => {
     showStatus(String(err), "error");
   }
 });
+historyEl.addEventListener("change", async () => {
+  const limit = Number(historyEl.value);
+  try {
+    await invoke("set_history_limit", { limit });
+    showStatus(
+      limit === 0 ? "Histórico desativado e apagado." : `O histórico guarda as últimas ${limit} capturas.`,
+      "ok",
+    );
+  } catch (err) {
+    showStatus(String(err), "error");
+  }
+});
 window.addEventListener("blur", () => {
   if (recording) void stopRecording();
 });
@@ -176,6 +141,12 @@ async function init() {
   isMac = s.platform === "macos";
   values.area = s.shortcut_area;
   values.full = s.shortcut_full;
+  values.gallery = s.shortcut_gallery;
+  // A limit set by hand in config.json still shows up in the list.
+  if (![...historyEl.options].some((o) => Number(o.value) === s.history_limit)) {
+    historyEl.add(new Option(`Últimas ${s.history_limit}`, String(s.history_limit)));
+  }
+  historyEl.value = String(s.history_limit);
   dirEl.textContent = `\u200e${s.save_dir}\u200e`;
   dirEl.title = s.save_dir;
   render();
