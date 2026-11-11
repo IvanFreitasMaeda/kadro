@@ -10,6 +10,7 @@ Feito com [Tauri 2](https://v2.tauri.app) (Rust + TypeScript), para ser leve: o 
 - **Um clique** no ícone abre a captura. Clique direito mostra o menu.
 - Selecione uma área arrastando, ou pegue a tela inteira.
 - Ajuste a seleção depois: arraste para mover, use as alças para redimensionar.
+- Anote antes de copiar: lápis, marca-texto, linha, seta, retângulo, elipse e texto, com cores, três espessuras e desfazer/refazer.
 - Copie para a área de transferência ou salve em PNG numa pasta.
 - Atalhos e pasta de capturas configuráveis em Preferências.
 - Funciona com vários monitores.
@@ -32,6 +33,11 @@ Dentro da captura:
 | `Ctrl/⌘ Shift S` | Salvar como… |
 | `F` ou `Ctrl/⌘ A` | Selecionar a tela inteira |
 | `Esc` ou clique direito | Cancelar |
+| `P` `M` `L` `A` `R` `E` `T` | Lápis, marca-texto, linha, seta, retângulo, elipse, texto (de novo para soltar) |
+| `Shift` enquanto desenha | Trava o ângulo da linha/seta, faz quadrado ou círculo |
+| `Ctrl/⌘ Z` · `Ctrl/⌘ Shift Z` | Desfazer · refazer |
+
+No texto, `Enter` confirma e `Shift Enter` quebra a linha.
 
 As capturas são salvas em `Imagens/Kadro` por padrão. Dá para trocar a pasta em **Preferências…**.
 
@@ -68,13 +74,14 @@ Estrutura:
 - `src-tauri/src/shortcuts.rs`: atalhos globais configuráveis.
 - `src-tauri/src/settings.rs`: janela de preferências.
 - `src-tauri/src/config.rs`: configurações salvas (atalhos e pasta de capturas).
-- `src/overlay.ts`: interface de seleção.
+- `src/overlay.ts`: interface de seleção e anotação.
+- `src/annotate.ts`: formas das anotações e como desenhá-las.
 - `src/settings.ts`: interface das preferências.
 
 ## Próximos passos
 
 1. ~~Captura de imagem~~
-2. Anotações: lápis, pincel, setas, formas e texto
+2. ~~Anotações: lápis, pincel, setas, formas e texto~~
 3. Histórico em galeria na lateral
 4. Gravação de tela em MP4 e GIF
 5. Instaladores e releases públicas
