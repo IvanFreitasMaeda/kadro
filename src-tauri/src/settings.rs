@@ -4,7 +4,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_dialog::DialogExt;
 
-use crate::{config, shortcuts};
+use crate::{config, history, shortcuts};
 
 const LABEL: &str = "settings";
 
@@ -17,7 +17,7 @@ pub fn open(app: &AppHandle) {
     }
     let result = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("settings.html".into()))
         .title("Preferências do Kadro")
-        .inner_size(480.0, 300.0)
+        .inner_size(480.0, 380.0)
         .resizable(false)
         .maximizable(false)
         .minimizable(false)
@@ -36,8 +36,8 @@ pub fn open(app: &AppHandle) {
 pub struct Settings {
     shortcut_area: String,
     shortcut_full: String,
-    default_area: &'static str,
-    default_full: &'static str,
+    shortcut_gallery: String,
+    history_limit: usize,
     save_dir: String,
     platform: &'static str,
 }
@@ -48,8 +48,8 @@ pub fn get_settings(app: AppHandle) -> Settings {
     Settings {
         shortcut_area: shortcuts::current(&app, shortcuts::Kind::Area),
         shortcut_full: shortcuts::current(&app, shortcuts::Kind::Full),
-        default_area: shortcuts::DEFAULT_AREA,
-        default_full: shortcuts::DEFAULT_FULL,
+        shortcut_gallery: shortcuts::current(&app, shortcuts::Kind::Gallery),
+        history_limit: history::limit(&app),
         save_dir: save_dir.display().to_string(),
         platform: std::env::consts::OS,
     }

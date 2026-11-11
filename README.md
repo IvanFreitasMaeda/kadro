@@ -12,7 +12,8 @@ Feito com [Tauri 2](https://v2.tauri.app) (Rust + TypeScript), para ser leve: o 
 - Ajuste a seleção depois: arraste para mover, use as alças para redimensionar.
 - Anote antes de copiar: lápis, marca-texto, linha, seta, retângulo, elipse e texto, com cores, três espessuras e desfazer/refazer.
 - Copie para a área de transferência ou salve em PNG numa pasta.
-- Atalhos e pasta de capturas configuráveis em Preferências.
+- Histórico na lateral: as últimas capturas aparecem em miniatura, e um clique copia de novo. Dá para salvar, abrir ou remover cada uma dali.
+- Atalhos, pasta de capturas e tamanho do histórico configuráveis em Preferências.
 - Funciona com vários monitores.
 
 ## Atalhos
@@ -21,8 +22,9 @@ Feito com [Tauri 2](https://v2.tauri.app) (Rust + TypeScript), para ser leve: o 
 | --- | --- | --- |
 | Capturar área | `⌘ ⇧ 2` | `Ctrl Shift 2` |
 | Capturar tela inteira | `⌘ ⇧ 1` | `Ctrl Shift 1` |
+| Abrir/fechar o histórico | `⌘ ⇧ 0` | `Ctrl Shift 0` |
 
-Dá para trocar os dois atalhos em **Preferências…**, no menu do ícone: clique no atalho e pressione a nova combinação.
+Dá para trocar os atalhos em **Preferências…**, no menu do ícone: clique no atalho e pressione a nova combinação.
 
 Dentro da captura:
 
@@ -40,6 +42,19 @@ Dentro da captura:
 No texto, `Enter` confirma e `Shift Enter` quebra a linha.
 
 As capturas são salvas em `Imagens/Kadro` por padrão. Dá para trocar a pasta em **Preferências…**.
+
+No histórico:
+
+| Tecla | Ação |
+| --- | --- |
+| Clique na miniatura ou `Enter` | Copiar |
+| `↑` `↓` | Escolher a captura |
+| `Ctrl/⌘ S` · `Ctrl/⌘ Shift S` | Salvar na pasta · salvar como… |
+| `Espaço` | Abrir no visualizador de imagens |
+| `Delete` | Remover do histórico |
+| `Esc` ou clique fora | Fechar |
+
+O histórico guarda as últimas 30 capturas por padrão (dá para mudar ou desativar em **Preferências…**). Elas ficam na pasta de dados do app, separadas da pasta de capturas: remover do histórico não apaga o que você salvou.
 
 ## Instalar (versão de teste)
 
@@ -72,17 +87,20 @@ Estrutura:
 - `src-tauri/src/capture.rs`: captura dos monitores, janelas de seleção, recorte, copiar e salvar.
 - `src-tauri/src/tray.rs`: ícone e menu da bandeja.
 - `src-tauri/src/shortcuts.rs`: atalhos globais configuráveis.
+- `src-tauri/src/history.rs`: histórico de capturas (imagem e miniatura em disco).
+- `src-tauri/src/gallery.rs`: janela lateral do histórico.
 - `src-tauri/src/settings.rs`: janela de preferências.
-- `src-tauri/src/config.rs`: configurações salvas (atalhos e pasta de capturas).
+- `src-tauri/src/config.rs`: configurações salvas (atalhos, pasta de capturas e tamanho do histórico).
 - `src/overlay.ts`: interface de seleção e anotação.
 - `src/annotate.ts`: formas das anotações e como desenhá-las.
+- `src/gallery.ts`: interface do histórico.
 - `src/settings.ts`: interface das preferências.
 
 ## Próximos passos
 
 1. ~~Captura de imagem~~
 2. ~~Anotações: lápis, pincel, setas, formas e texto~~
-3. Histórico em galeria na lateral
+3. ~~Histórico em galeria na lateral~~
 4. Gravação de tela em MP4 e GIF
 5. Instaladores e releases públicas
 

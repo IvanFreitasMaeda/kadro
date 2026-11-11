@@ -9,7 +9,7 @@ use tauri::{
 use tauri_plugin_opener::OpenerExt;
 
 use crate::{
-    capture, config, settings,
+    capture, config, gallery, settings,
     shortcuts::{self, Kind},
 };
 
@@ -17,6 +17,7 @@ use crate::{
 pub struct TrayItems {
     area: MenuItem<Wry>,
     full: MenuItem<Wry>,
+    gallery: MenuItem<Wry>,
 }
 
 pub fn create(app: &AppHandle) -> tauri::Result<()> {
@@ -34,12 +35,20 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         true,
         Some(shortcuts::current(app, Kind::Full)),
     )?;
+    let gallery = MenuItem::with_id(
+        app,
+        "gallery",
+        "Histórico de capturas",
+        true,
+        Some(shortcuts::current(app, Kind::Gallery)),
+    )?;
     let menu = Menu::with_items(
         app,
         &[
             &area,
             &full,
             &PredefinedMenuItem::separator(app)?,
+            &gallery,
             &MenuItem::with_id(
                 app,
                 "open_dir",
@@ -52,7 +61,11 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
             &MenuItem::with_id(app, "quit", "Sair do Kadro", true, None::<&str>)?,
         ],
     )?;
-    app.manage(TrayItems { area, full });
+    app.manage(TrayItems {
+        area,
+        full,
+        gallery,
+    });
 
     // macOS menu bar icons are monochrome "template" images; elsewhere use the app icon.
     #[cfg(target_os = "macos")]
@@ -73,6 +86,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         .on_menu_event(|app, event| match event.id().as_ref() {
             "area" => capture::start(app, false),
             "full" => capture::start(app, true),
+            "gallery" => gallery::toggle(app),
             "open_dir" => open_save_dir(app),
             "settings" => settings::open(app),
             "quit" => app.exit(0),
@@ -112,4 +126,7 @@ pub fn refresh_accelerators(app: &AppHandle) {
     let _ = items
         .full
         .set_accelerator(Some(shortcuts::current(app, Kind::Full)));
+    let _ = items
+        .gallery
+        .set_accelerator(Some(shortcuts::current(app, Kind::Gallery)));
 }

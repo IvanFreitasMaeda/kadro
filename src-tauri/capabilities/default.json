@@ -1,10 +1,11 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "overlay",
-  "description": "Permissions for the capture overlays and the preferences window",
+  "description": "Permissions for the capture overlays, the preferences window and the gallery",
   "windows": [
     "overlay-*",
-    "settings"
+    "settings",
+    "gallery"
   ],
   "permissions": [
     "core:default",

@@ -4,19 +4,24 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, Wry};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
-use crate::{capture, config, tray};
+use crate::{capture, config, gallery, tray};
 
 /// Select an area (Cmd+Shift+2 on macOS, Ctrl+Shift+2 on Windows).
 pub const DEFAULT_AREA: &str = "CommandOrControl+Shift+2";
 /// Whole screen under the cursor, preselected.
 pub const DEFAULT_FULL: &str = "CommandOrControl+Shift+1";
+/// History gallery. Not 3, 4 or 5: macOS uses Cmd+Shift+3/4/5 for its own screenshots.
+pub const DEFAULT_GALLERY: &str = "CommandOrControl+Shift+0";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Kind {
     Area,
     Full,
+    Gallery,
 }
+
+pub const ALL: [Kind; 3] = [Kind::Area, Kind::Full, Kind::Gallery];
 
 /// The accelerator currently configured for `kind`.
 pub fn current(app: &AppHandle, kind: Kind) -> String {
@@ -25,6 +30,7 @@ pub fn current(app: &AppHandle, kind: Kind) -> String {
     match kind {
         Kind::Area => config.shortcut_area.clone(),
         Kind::Full => config.shortcut_full.clone(),
+        Kind::Gallery => config.shortcut_gallery.clone(),
     }
     .unwrap_or_else(|| default(kind).to_string())
 }
@@ -33,7 +39,17 @@ fn default(kind: Kind) -> &'static str {
     match kind {
         Kind::Area => DEFAULT_AREA,
         Kind::Full => DEFAULT_FULL,
+        Kind::Gallery => DEFAULT_GALLERY,
     }
+}
+
+/// Which action the pressed shortcut belongs to.
+fn kind_of(app: &AppHandle, shortcut: &Shortcut) -> Option<Kind> {
+    ALL.into_iter().find(|&kind| {
+        current(app, kind)
+            .parse::<Shortcut>()
+            .is_ok_and(|s| &s == shortcut)
+    })
 }
 
 pub fn plugin() -> tauri::plugin::TauriPlugin<Wry> {
@@ -43,18 +59,19 @@ pub fn plugin() -> tauri::plugin::TauriPlugin<Wry> {
                 return;
             }
             let app = app.app_handle();
-            let full = current(app, Kind::Full)
-                .parse::<Shortcut>()
-                .is_ok_and(|s| &s == shortcut);
-            capture::start(app, full);
+            match kind_of(app, shortcut) {
+                Some(Kind::Gallery) => gallery::toggle(app),
+                Some(Kind::Full) => capture::start(app, true),
+                _ => capture::start(app, false),
+            }
         })
         .build()
 }
 
-/// Registers both configured shortcuts. Failures are logged: another app may own the
+/// Registers the configured shortcuts. Failures are logged: another app may own the
 /// combination, and the tray icon still works.
 pub fn register_all(app: &AppHandle) {
-    for kind in [Kind::Area, Kind::Full] {
+    for kind in ALL {
         let accelerator = current(app, kind);
         if let Err(err) = app.global_shortcut().register(accelerator.as_str()) {
             log::warn!("could not register {accelerator}: {err}");
@@ -76,15 +93,8 @@ pub fn set(app: &AppHandle, kind: Kind, accelerator: Option<String>) -> Result<S
     let parsed: Shortcut = accelerator
         .parse()
         .map_err(|_| format!("Atalho inválido: {accelerator}"))?;
-    let other = match kind {
-        Kind::Area => Kind::Full,
-        Kind::Full => Kind::Area,
-    };
-    if current(app, other)
-        .parse::<Shortcut>()
-        .is_ok_and(|s| s == parsed)
-    {
-        return Err("Esse atalho já está sendo usado pela outra captura.".into());
+    if kind_of(app, &parsed).is_some_and(|other| other != kind) {
+        return Err("Esse atalho já está sendo usado por outra ação do Kadro.".into());
     }
 
     // Try the new combination before saving it: the OS refuses ones that another
@@ -105,6 +115,7 @@ pub fn set(app: &AppHandle, kind: Kind, accelerator: Option<String>) -> Result<S
         match kind {
             Kind::Area => config.shortcut_area = value,
             Kind::Full => config.shortcut_full = value,
+            Kind::Gallery => config.shortcut_gallery = value,
         }
         config::store(app, &config)?;
     }

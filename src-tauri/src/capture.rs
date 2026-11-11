@@ -24,7 +24,7 @@ use tauri::{
 };
 use tauri_plugin_dialog::DialogExt;
 
-use crate::config;
+use crate::{config, gallery, history};
 
 const OVERLAY_PREFIX: &str = "overlay-";
 
@@ -72,6 +72,11 @@ fn open_overlays(app: &AppHandle, full: bool) -> Result<(), String> {
             .active
             .store(false, Ordering::SeqCst);
         return Ok(());
+    }
+
+    // The gallery would end up in the screenshot.
+    if gallery::close(app) {
+        std::thread::sleep(std::time::Duration::from_millis(150));
     }
 
     let cursor = app.cursor_position().ok();
@@ -207,7 +212,8 @@ pub fn close_all(app: &AppHandle) {
     state.active.store(false, Ordering::SeqCst);
 }
 
-/// Serves `kadro://localhost/<monitor>/<nonce>` as a PNG of that monitor's screenshot.
+/// Serves `kadro://localhost/<monitor>/<nonce>` as a PNG of that monitor's screenshot,
+/// and the gallery's images under `kadro://localhost/h/`.
 pub fn serve_shot<R: Runtime>(
     ctx: UriSchemeContext<'_, R>,
     request: http::Request<Vec<u8>>,
@@ -218,6 +224,20 @@ pub fn serve_shot<R: Runtime>(
         .decode_utf8_lossy()
         .into_owned();
     std::thread::spawn(move || {
+        // Gallery images: `h/<id>.jpg` or `h/<id>.png`.
+        if let Some(name) = path.trim_start_matches('/').strip_prefix("h/") {
+            let response = match history::serve(&app, name) {
+                Some((bytes, mime)) => http::Response::builder()
+                    .header(http::header::CONTENT_TYPE, mime)
+                    .header(http::header::CACHE_CONTROL, "max-age=31536000, immutable")
+                    .body(bytes),
+                None => http::Response::builder()
+                    .status(http::StatusCode::NOT_FOUND)
+                    .body(Vec::new()),
+            };
+            responder.respond(response.unwrap());
+            return;
+        }
         let index = path
             .trim_start_matches('/')
             .split('/')
@@ -243,7 +263,7 @@ pub fn serve_shot<R: Runtime>(
     });
 }
 
-fn encode_png(img: &RgbaImage, compression: CompressionType) -> Result<Vec<u8>, String> {
+pub(crate) fn encode_png(img: &RgbaImage, compression: CompressionType) -> Result<Vec<u8>, String> {
     let mut buf = Vec::new();
     PngEncoder::new_with_quality(&mut buf, compression, FilterType::Adaptive)
         .write_image(
@@ -277,16 +297,13 @@ fn write_png(img: &RgbaImage, path: &Path) -> Result<(), String> {
     std::fs::write(path, bytes).map_err(|e| format!("não foi possível salvar: {e}"))
 }
 
-fn file_name() -> String {
-    format!(
-        "Kadro {}.png",
-        chrono::Local::now().format("%Y-%m-%d às %H.%M.%S")
-    )
+pub(crate) fn file_name(time: chrono::DateTime<chrono::Local>) -> String {
+    format!("Kadro {}.png", time.format("%Y-%m-%d às %H.%M.%S"))
 }
 
-/// Picks a file name in `dir` that doesn't exist yet.
-fn unique_path(dir: &Path) -> PathBuf {
-    let name = file_name();
+/// Picks a file name in `dir`, for a capture taken at `time`, that doesn't exist yet.
+pub(crate) fn unique_path(dir: &Path, time: chrono::DateTime<chrono::Local>) -> PathBuf {
+    let name = file_name(time);
     let mut path = dir.join(&name);
     let stem = name.trim_end_matches(".png").to_string();
     let mut n = 2;
@@ -297,7 +314,7 @@ fn unique_path(dir: &Path) -> PathBuf {
     path
 }
 
-fn copy_to_clipboard(app: &AppHandle, img: RgbaImage) -> Result<(), String> {
+pub(crate) fn copy_to_clipboard(app: &AppHandle, img: RgbaImage) -> Result<(), String> {
     let state = app.state::<CaptureState>();
     let mut guard = state.clipboard.lock().unwrap();
     if guard.is_none() {
@@ -348,6 +365,7 @@ pub async fn copy_selection(
 ) -> Result<(), String> {
     let img = compose(&app, &window, &request)?;
     close_all(&app);
+    history::add(&app, img.clone());
     copy_to_clipboard(&app, img)
 }
 
@@ -360,8 +378,9 @@ pub async fn save_selection(
     request: Request<'_>,
 ) -> Result<String, String> {
     let img = compose(&app, &window, &request)?;
-    let path = unique_path(&config::save_dir(&app)?);
+    let path = unique_path(&config::save_dir(&app)?, chrono::Local::now());
     write_png(&img, &path)?;
+    history::add(&app, img);
     Ok(path.display().to_string())
 }
 
@@ -380,12 +399,13 @@ pub async fn save_selection_as(
         .file()
         .set_title("Salvar captura")
         .set_directory(dir)
-        .set_file_name(file_name())
+        .set_file_name(file_name(chrono::Local::now()))
         .add_filter("Imagem PNG", &["png"])
         .blocking_save_file();
     let Some(path) = chosen.and_then(|p| p.as_path().map(Path::to_path_buf)) else {
         return Ok(());
     };
+    history::add(&app, img.clone());
     let path = if path.extension().is_none() {
         path.with_extension("png")
     } else {

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Histórico do Kadro</title>
+    <link rel="stylesheet" href="/src/gallery.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Histórico</h1>
+      <span id="count"></span>
+      <button id="clear" class="icon" data-tip="Apagar todo o histórico" aria-label="Apagar todo o histórico">
+        <svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" /></svg>
+      </button>
+      <button id="close" class="icon" data-tip="Fechar (Esc)" aria-label="Fechar (Esc)">
+        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg>
+      </button>
+    </header>
+    <main id="list"></main>
+    <div id="empty" hidden>
+      <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="9" cy="10" r="1.5" /><path d="M21 16l-5-5-8 8" /></svg>
+      <p>Nenhuma captura ainda.</p>
+      <p class="muted">Capture uma área com <kbd id="shortcut-area"></kbd> e ela aparece aqui.</p>
+    </div>
+    <footer id="status"></footer>
+    <template id="card">
+      <article class="card" tabindex="-1">
+        <div class="thumb">
+          <img alt="" draggable="false" loading="lazy" decoding="async" />
+          <div class="ops">
+            <button data-op="copy" class="icon" data-tip="Copiar (Enter)" aria-label="Copiar">
+              <svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></svg>
+            </button>
+            <button data-op="save" class="icon" data-tip="Salvar na pasta (Ctrl+S)" aria-label="Salvar na pasta">
+              <svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></svg>
+            </button>
+            <button data-op="saveas" class="icon" data-tip="Salvar como… (Ctrl+Shift+S)" aria-label="Salvar como">
+              <svg viewBox="0 0 24 24"><path d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" /></svg>
+            </button>
+            <button data-op="open" class="icon" data-tip="Abrir no visualizador (Espaço)" aria-label="Abrir no visualizador">
+              <svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4" /></svg>
+            </button>
+            <button data-op="delete" class="icon danger" data-tip="Remover do histórico (Delete)" aria-label="Remover do histórico">
+              <svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" /></svg>
+            </button>
+          </div>
+          <span class="flash">Copiado</span>
+        </div>
+        <div class="meta"><span class="time"></span><span class="dims"></span></div>
+      </article>
+    </template>
+    <div id="tip" role="tooltip" hidden></div>
+    <script type="module" src="/src/gallery.ts"></script>
+  </body>
+</html>
