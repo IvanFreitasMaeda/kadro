@@ -9,6 +9,7 @@
   <body>
     <img id="shot" alt="" draggable="false" />
     <div id="dim"></div>
+    <canvas id="ink"></canvas>
     <div id="sel" hidden>
       <div class="handle" data-h="nw"></div>
       <div class="handle" data-h="n"></div>
@@ -19,11 +20,12 @@
       <div class="handle" data-h="sw"></div>
       <div class="handle" data-h="w"></div>
     </div>
+    <textarea id="text-edit" wrap="off" spellcheck="false" hidden></textarea>
     <div id="size" hidden></div>
     <div id="hint">
       Arraste para selecionar · <kbd>F</kbd> tela inteira · <kbd>Esc</kbd> cancelar
     </div>
-    <div id="toolbar" hidden>
+    <div id="toolbar" class="bar" hidden>
       <button data-action="full" data-tip="Tela inteira (F)" aria-label="Tela inteira (F)">
         <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
       </button>
@@ -41,6 +43,45 @@
       <button data-action="close" data-tip="Cancelar (Esc)" aria-label="Cancelar (Esc)">
         <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg>
       </button>
+    </div>
+    <div id="tools" class="bar vertical" hidden>
+      <button data-tool="pen" data-tip="Lápis (P)" aria-label="Lápis (P)">
+        <svg viewBox="0 0 24 24"><path d="M4 20l1-4L16 5l3 3L8 19z" /><path d="M14 7l3 3" /></svg>
+      </button>
+      <button data-tool="marker" data-tip="Marca-texto (M)" aria-label="Marca-texto (M)">
+        <svg viewBox="0 0 24 24"><path d="M9 15l-3 3h-2v-2l3-3" /><path d="M7 13l8-8 4 4-8 8z" /><path d="M13 20h7" /></svg>
+      </button>
+      <button data-tool="line" data-tip="Linha (L) · Shift trava o ângulo" aria-label="Linha (L)">
+        <svg viewBox="0 0 24 24"><path d="M5 19L19 5" /></svg>
+      </button>
+      <button data-tool="arrow" data-tip="Seta (A) · Shift trava o ângulo" aria-label="Seta (A)">
+        <svg viewBox="0 0 24 24"><path d="M5 19L19 5M10 5h9v9" /></svg>
+      </button>
+      <button data-tool="rect" data-tip="Retângulo (R) · Shift faz um quadrado" aria-label="Retângulo (R)">
+        <svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="1" /></svg>
+      </button>
+      <button data-tool="ellipse" data-tip="Elipse (E) · Shift faz um círculo" aria-label="Elipse (E)">
+        <svg viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="8" ry="6" /></svg>
+      </button>
+      <button data-tool="text" data-tip="Texto (T)" aria-label="Texto (T)">
+        <svg viewBox="0 0 24 24"><path d="M5 6V4h14v2M12 4v16M9 20h6" /></svg>
+      </button>
+      <span class="sep"></span>
+      <button data-action="color" data-tip="Cor" aria-label="Cor">
+        <span class="swatch"></span>
+      </button>
+      <button data-action="size" data-tip="Espessura" aria-label="Espessura">
+        <svg viewBox="0 0 24 24"><circle class="dot" cx="12" cy="12" r="4" /></svg>
+      </button>
+      <span class="sep"></span>
+      <button data-action="undo" data-tip="Desfazer (Ctrl+Z)" aria-label="Desfazer (Ctrl+Z)">
+        <svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5" /><path d="M4 9h11a5 5 0 0 1 0 10h-3" /></svg>
+      </button>
+      <button data-action="redo" data-tip="Refazer (Ctrl+Shift+Z)" aria-label="Refazer (Ctrl+Shift+Z)">
+        <svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5" /><path d="M20 9H9a5 5 0 0 0 0 10h3" /></svg>
+      </button>
+      <div id="palette" class="popover" hidden></div>
+      <div id="sizes" class="popover" hidden></div>
     </div>
     <div id="toast" hidden></div>
     <script type="module" src="/src/overlay.ts"></script>

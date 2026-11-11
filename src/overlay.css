@@ -93,7 +93,7 @@ html, body {
   font-size: 13px;
 }
 
-#toolbar {
+.bar {
   position: fixed;
   display: flex;
   align-items: center;
@@ -104,7 +104,9 @@ html, body {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
   cursor: default;
 }
-#toolbar button {
+.bar.vertical { flex-direction: column; }
+.bar button {
+  position: relative;
   display: grid;
   place-items: center;
   width: 32px;
@@ -115,10 +117,13 @@ html, body {
   color: var(--bar-fg);
   cursor: pointer;
 }
-#toolbar button:hover { background: rgba(255, 255, 255, 0.12); }
+.bar button:hover { background: rgba(255, 255, 255, 0.12); }
+.bar button:disabled { opacity: 0.35; cursor: default; background: transparent; }
+.bar button.active,
 #toolbar button[data-action="copy"] { background: var(--accent); }
-#toolbar button[data-action="copy"]:hover { filter: brightness(1.1); }
-#toolbar svg {
+.bar button.active:hover,
+#toolbar button[data-action="copy"]:hover { background: var(--accent); filter: brightness(1.1); }
+.bar svg {
   width: 18px;
   height: 18px;
   fill: none;
@@ -127,16 +132,24 @@ html, body {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-#toolbar .sep {
+.bar svg .dot { fill: currentColor; stroke: none; }
+.bar .sep {
   width: 1px;
   height: 20px;
   margin: 0 3px;
   background: rgba(255, 255, 255, 0.18);
 }
+.bar.vertical .sep { width: 20px; height: 1px; margin: 3px 0; }
+.swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--ink, #ff3b30);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
+}
 
 /* Custom tooltips: native ones open below the overlay, which sits above every window. */
-#toolbar button { position: relative; }
-#toolbar button::after {
+.bar button::after {
   content: attr(data-tip);
   position: absolute;
   bottom: calc(100% + 8px);
@@ -151,9 +164,64 @@ html, body {
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.12s 0.25s;
+  z-index: 1;
 }
-#toolbar button:hover::after { opacity: 1; }
+.bar button:hover::after { opacity: 1; }
 #toolbar.tips-below button::after { bottom: auto; top: calc(100% + 8px); }
 #toolbar button:last-child::after { left: auto; right: 0; transform: none; }
+/* The tools bar is vertical: tooltips go to its side, away from the selection. */
+#tools button::after {
+  bottom: auto;
+  top: 50%;
+  left: calc(100% + 8px);
+  transform: translateY(-50%);
+}
+#tools.on-left button::after { left: auto; right: calc(100% + 8px); }
+#tools.popover-open button::after { display: none; }
+
+.popover {
+  position: absolute;
+  left: calc(100% + 8px);
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 10px;
+  background: var(--bar-bg);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+#tools.on-left .popover { left: auto; right: calc(100% + 8px); }
+#palette { grid-template-columns: repeat(4, 26px); }
+#palette button { width: 26px; height: 26px; }
+#palette button .swatch { background: var(--c); }
+#palette button.active { background: rgba(255, 255, 255, 0.22); }
+#sizes button { width: auto; padding: 0 10px 0 6px; gap: 6px; grid-auto-flow: column; justify-content: start; font-size: 12px; }
+#sizes button.active { background: rgba(255, 255, 255, 0.22); }
+.popover button::after { display: none; }
+
+#ink {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+}
+
+body.drawing #sel { cursor: crosshair; }
+body.typing #sel { cursor: text; }
+
+#text-edit {
+  position: fixed;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: 1px dashed rgba(255, 255, 255, 0.8);
+  outline-offset: 3px;
+  background: transparent;
+  resize: none;
+  overflow: hidden;
+  white-space: pre;
+  min-width: 4px;
+  caret-color: currentColor;
+}
 
 [hidden] { display: none !important; }

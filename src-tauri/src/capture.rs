@@ -13,11 +13,13 @@ use std::{
 
 use image::{
     codecs::png::{CompressionType, FilterType, PngEncoder},
-    imageops, ExtendedColorType, ImageEncoder, RgbaImage,
+    imageops, ExtendedColorType, ImageEncoder, ImageFormat, RgbaImage,
 };
 use serde::Deserialize;
 use tauri::{
-    http, AppHandle, Manager, PhysicalPosition, PhysicalSize, Runtime, UriSchemeContext,
+    http,
+    ipc::{InvokeBody, Request},
+    AppHandle, Manager, PhysicalPosition, PhysicalSize, Runtime, UriSchemeContext,
     UriSchemeResponder, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
 };
 use tauri_plugin_dialog::DialogExt;
@@ -37,7 +39,7 @@ pub struct CaptureState {
     clipboard: Mutex<Option<arboard::Clipboard>>,
 }
 
-/// Selection in screenshot pixels, sent by the overlay.
+/// Selection in screenshot pixels, sent by the overlay in the `x-kadro-rect` header.
 #[derive(Debug, Deserialize)]
 pub struct Rect {
     x: u32,
@@ -313,13 +315,38 @@ fn copy_to_clipboard(app: &AppHandle, img: RgbaImage) -> Result<(), String> {
         .map_err(|e| format!("não foi possível copiar: {e}"))
 }
 
+/// Builds the final image from an overlay request: the selection comes in a header
+/// and the annotations, if any, as a transparent PNG of the same size in the body.
+fn compose(
+    app: &AppHandle,
+    window: &WebviewWindow,
+    request: &Request<'_>,
+) -> Result<RgbaImage, String> {
+    let rect: Rect = request
+        .headers()
+        .get("x-kadro-rect")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| serde_json::from_str(v).ok())
+        .ok_or("seleção inválida")?;
+    let mut img = crop(app, window, &rect)?;
+    if let InvokeBody::Raw(bytes) = request.body() {
+        if !bytes.is_empty() {
+            let ink = image::load_from_memory_with_format(bytes, ImageFormat::Png)
+                .map_err(|e| format!("anotações inválidas: {e}"))?
+                .to_rgba8();
+            imageops::overlay(&mut img, &ink, 0, 0);
+        }
+    }
+    Ok(img)
+}
+
 #[tauri::command]
 pub async fn copy_selection(
     app: AppHandle,
     window: WebviewWindow,
-    rect: Rect,
+    request: Request<'_>,
 ) -> Result<(), String> {
-    let img = crop(&app, &window, &rect)?;
+    let img = compose(&app, &window, &request)?;
     close_all(&app);
     copy_to_clipboard(&app, img)
 }
@@ -330,9 +357,9 @@ pub async fn copy_selection(
 pub async fn save_selection(
     app: AppHandle,
     window: WebviewWindow,
-    rect: Rect,
+    request: Request<'_>,
 ) -> Result<String, String> {
-    let img = crop(&app, &window, &rect)?;
+    let img = compose(&app, &window, &request)?;
     let path = unique_path(&config::save_dir(&app)?);
     write_png(&img, &path)?;
     Ok(path.display().to_string())
@@ -342,9 +369,9 @@ pub async fn save_selection(
 pub async fn save_selection_as(
     app: AppHandle,
     window: WebviewWindow,
-    rect: Rect,
+    request: Request<'_>,
 ) -> Result<(), String> {
-    let img = crop(&app, &window, &rect)?;
+    let img = compose(&app, &window, &request)?;
     // Close first: the overlay sits above everything, including the save dialog.
     close_all(&app);
     let dir = config::save_dir(&app).unwrap_or_else(|_| config::default_save_dir());
