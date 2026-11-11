@@ -44,6 +44,8 @@ xattr -cr /Applications/Kadro.app
 
 Se ainda aparecer aviso, vá em **Ajustes do Sistema → Privacidade e Segurança** e clique em **Abrir Mesmo Assim**. O Kadro não abre janela: ele aparece como um ícone na barra de menus. Na primeira captura o macOS pede a permissão de **Gravação de Tela**. Depois de liberar, feche o Kadro pelo menu do ícone e abra de novo.
 
+Enquanto o app não tiver assinatura da Apple, cada versão nova é vista pelo macOS como outro app. Se a permissão aparecer marcada mas a captura não funcionar, rode `tccutil reset ScreenCapture io.github.ivanfreitasmaeda.kadro`, abra o Kadro e libere de novo.
+
 **Windows:** o SmartScreen pode avisar que o app é desconhecido. Clique em **Mais informações → Executar assim mesmo**.
 
 ## Desenvolvimento

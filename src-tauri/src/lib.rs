@@ -1,5 +1,7 @@
 mod capture;
 mod config;
+#[cfg(target_os = "macos")]
+mod permissions;
 mod shortcuts;
 mod tray;
 

@@ -64,6 +64,14 @@ pub fn start(app: &AppHandle, full: bool) {
 }
 
 fn open_overlays(app: &AppHandle, full: bool) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    if !crate::permissions::ensure_screen_capture(app) {
+        app.state::<CaptureState>()
+            .active
+            .store(false, Ordering::SeqCst);
+        return Ok(());
+    }
+
     let cursor = app.cursor_position().ok();
     let monitors = xcap::Monitor::all().map_err(|e| e.to_string())?;
     let screens = app.available_monitors().map_err(|e| e.to_string())?;
