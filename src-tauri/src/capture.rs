@@ -93,7 +93,7 @@ fn open_overlays(app: &AppHandle, full: bool) -> Result<(), String> {
             "window.__KADRO__ = {{ monitor: {i}, nonce: {nonce}, full: {} }};",
             full && under_cursor
         );
-        let window = WebviewWindowBuilder::new(
+        let builder = WebviewWindowBuilder::new(
             app,
             format!("{OVERLAY_PREFIX}{i}"),
             WebviewUrl::App("overlay.html".into()),
@@ -107,11 +107,36 @@ fn open_overlays(app: &AppHandle, full: bool) -> Result<(), String> {
         .visible_on_all_workspaces(true)
         .shadow(false)
         .visible(false)
-        .focused(true)
-        .build()
-        .map_err(|e| e.to_string())?;
-        window.set_position(pos).map_err(|e| e.to_string())?;
-        window.set_size(size).map_err(|e| e.to_string())?;
+        .focused(true);
+
+        // macOS: xcap reports the display frame in points with a top-left origin, which
+        // is exactly what Tauri's logical coordinates are. Creating the window with its
+        // final frame avoids resizing it afterwards: Cocoa keeps the bottom-left corner
+        // fixed on resize, which pushed the overlay off the top of the screen.
+        #[cfg(target_os = "macos")]
+        let window = {
+            let m = &monitors[i];
+            builder
+                .position(m.x().unwrap_or(0) as f64, m.y().unwrap_or(0) as f64)
+                .inner_size(
+                    m.width().unwrap_or(size.width) as f64,
+                    m.height().unwrap_or(size.height) as f64,
+                )
+                .build()
+                .map_err(|e| e.to_string())?
+        };
+
+        // Windows/Linux: place in physical pixels, which stays exact across monitors
+        // with different scaling. Size again after moving, because moving onto a
+        // monitor with another scale makes Windows rescale the window.
+        #[cfg(not(target_os = "macos"))]
+        {
+            let window = builder.build().map_err(|e| e.to_string())?;
+            window.set_size(size).map_err(|e| e.to_string())?;
+            window.set_position(pos).map_err(|e| e.to_string())?;
+            window.set_size(size).map_err(|e| e.to_string())?;
+        }
+
         #[cfg(target_os = "macos")]
         raise_above_menu_bar(&window);
     }
