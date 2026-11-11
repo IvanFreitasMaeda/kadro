@@ -5,8 +5,21 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { pretty } from "./keys";
 
-type Item = { id: string; time: number; width: number; height: number };
-type Op = "copy" | "save" | "saveas" | "open" | "delete";
+type Item = {
+  id: string;
+  time: number;
+  width: number;
+  height: number;
+  kind: "image" | "mp4" | "gif";
+  /** Length of a recording, in milliseconds. */
+  duration?: number;
+  /** The recording's file was moved or deleted. */
+  missing?: boolean;
+};
+type Op = "copy" | "save" | "saveas" | "open" | "reveal" | "delete";
+
+const REVEAL_ICON =
+  '<svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><path d="M12 11v5M9.5 13.5 12 16l2.5-2.5" /></svg>';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const list = $("list");
@@ -50,6 +63,43 @@ function when(time: number): string {
   return `${dateFmt.format(d)} ${timeFmt.format(d)}`;
 }
 
+/** "0:07" or "1:02:03". */
+function length(ms: number): string {
+  const s = Math.round(ms / 1000);
+  const mm = Math.floor(s / 60) % 60;
+  const ss = String(s % 60).padStart(2, "0");
+  return s >= 3600 ? `${Math.floor(s / 3600)}:${String(mm).padStart(2, "0")}:${ss}` : `${mm}:${ss}`;
+}
+
+/** Recordings get a badge and file-oriented buttons. */
+function dressRecording(card: HTMLElement, item: Item) {
+  const isGif = item.kind === "gif";
+  card.classList.add("video");
+  card.classList.toggle("missing", !!item.missing);
+  const badge = card.querySelector<HTMLElement>(".badge")!;
+  badge.hidden = false;
+  badge.querySelector(".badge-text")!.textContent = `${isGif ? "GIF" : "MP4"} · ${length(item.duration ?? 0)}`;
+  const tip = (op: Op, text: string) => {
+    const b = card.querySelector<HTMLElement>(`[data-op="${op}"]`)!;
+    b.dataset.tip = text;
+    b.setAttribute("aria-label", text.replace(/ \(.*\)$/, ""));
+    return b;
+  };
+  tip("copy", "Copiar arquivo (Enter)");
+  tip("open", isGif ? "Abrir (Espaço)" : "Reproduzir (Espaço)");
+  const save = tip("save", "Mostrar na pasta (Ctrl+S)");
+  save.dataset.op = "reveal";
+  save.innerHTML = REVEAL_ICON;
+  if (isMac) tipForMac(card);
+  if (item.missing) card.title = "O arquivo foi movido ou apagado";
+}
+
+function tipForMac(root: ParentNode) {
+  root.querySelectorAll<HTMLElement>("[data-tip]").forEach((b) => {
+    b.dataset.tip = b.dataset.tip!.replace(/Ctrl\+Shift\+/g, "⇧⌘").replace(/Ctrl\+/g, "⌘");
+  });
+}
+
 function cards(): HTMLElement[] {
   return [...list.children] as HTMLElement[];
 }
@@ -65,6 +115,7 @@ function render() {
       card.querySelector(".time")!.textContent = when(item.time);
       (card.querySelector(".time") as HTMLElement).title = new Date(item.time).toLocaleString("pt-BR");
       card.querySelector(".dims")!.textContent = `${item.width} × ${item.height}`;
+      if (item.kind !== "image") dressRecording(card, item);
       return card;
     }),
   );
@@ -93,13 +144,17 @@ async function run(op: Op, index: number) {
   select(index);
   const { id } = item;
   try {
+    const video = item.kind !== "image";
     if (op === "copy") {
       await invoke("history_copy", { id });
       const flash = cards()[index]?.querySelector(".flash");
       flash?.classList.remove("show");
       void (flash as HTMLElement | undefined)?.offsetWidth; // restart the animation
       flash?.classList.add("show");
-      showStatus("Copiada para a área de transferência", "ok");
+      showStatus(
+        video ? "Arquivo copiado: cole num chat, e-mail ou pasta" : "Copiada para a área de transferência",
+        "ok",
+      );
     } else if (op === "save") {
       const path = await invoke<string>("history_save", { id });
       showStatus(`Salva em ${path}`, "ok");
@@ -114,11 +169,13 @@ async function run(op: Op, index: number) {
       }
     } else if (op === "open") {
       await invoke("history_open", { id });
+    } else if (op === "reveal") {
+      await invoke("history_reveal", { id });
     } else if (op === "delete") {
       await invoke("history_delete", { id });
       items = items.filter((i) => i.id !== id);
       render();
-      showStatus("Removida do histórico", "ok");
+      showStatus(video ? "Removida do histórico (o arquivo continua na pasta)" : "Removida do histórico", "ok");
     }
   } catch (err) {
     showStatus(String(err), "error");
@@ -194,7 +251,8 @@ function onKeyDown(e: KeyboardEvent) {
     void run("copy", selected);
   } else if (mod && key === "s") {
     e.preventDefault();
-    void run(e.shiftKey ? "saveas" : "save", selected);
+    const video = items[selected]?.kind !== "image";
+    void run(e.shiftKey ? "saveas" : video ? "reveal" : "save", selected);
   } else if (e.key === " ") {
     e.preventDefault();
     void run("open", selected);
@@ -206,9 +264,8 @@ function onKeyDown(e: KeyboardEvent) {
 
 async function init() {
   if (isMac) {
-    document.querySelectorAll<HTMLElement>("[data-tip]").forEach((b) => {
-      b.dataset.tip = b.dataset.tip!.replace(/Ctrl\+Shift\+/g, "⇧⌘").replace(/Ctrl\+/g, "⌘");
-    });
+    tipForMac(document);
+    tipForMac(template.content);
   }
   showStatus(DEFAULT_STATUS);
 

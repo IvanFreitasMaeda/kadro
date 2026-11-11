@@ -22,6 +22,19 @@ pub fn toggle(app: &AppHandle) {
     });
 }
 
+/// Opens the gallery if it isn't open (it refreshes itself when the history changes).
+pub fn show(app: &AppHandle) {
+    if app.get_webview_window(LABEL).is_some() {
+        return;
+    }
+    let app = app.clone();
+    std::thread::spawn(move || {
+        if let Err(err) = open(&app) {
+            log::error!("could not open the gallery: {err}");
+        }
+    });
+}
+
 /// Closes the gallery. Returns whether it was open.
 pub fn close(app: &AppHandle) -> bool {
     match app.get_webview_window(LABEL) {

@@ -3,11 +3,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import { pretty as prettyFor } from "./keys";
 
-type Kind = "area" | "full" | "gallery";
+type Kind = "area" | "full" | "gallery" | "record";
 type Settings = {
   shortcut_area: string;
   shortcut_full: string;
   shortcut_gallery: string;
+  shortcut_record: string;
   history_limit: number;
   save_dir: string;
   platform: string;
@@ -23,7 +24,7 @@ document.querySelectorAll<HTMLButtonElement>(".shortcut").forEach((b) => {
 let isMac = navigator.userAgent.includes("Mac");
 const pretty = (accelerator: string) => prettyFor(accelerator, isMac);
 let recording: Kind | null = null;
-const values: Record<Kind, string> = { area: "", full: "", gallery: "" };
+const values: Record<Kind, string> = { area: "", full: "", gallery: "", record: "" };
 const historyEl = document.getElementById("history-limit") as HTMLSelectElement;
 const DEFAULT_HINT = status.innerHTML;
 
@@ -142,6 +143,7 @@ async function init() {
   values.area = s.shortcut_area;
   values.full = s.shortcut_full;
   values.gallery = s.shortcut_gallery;
+  values.record = s.shortcut_record;
   // A limit set by hand in config.json still shows up in the list.
   if (![...historyEl.options].some((o) => Number(o.value) === s.history_limit)) {
     historyEl.add(new Option(`Últimas ${s.history_limit}`, String(s.history_limit)));

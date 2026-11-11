@@ -167,6 +167,26 @@ svg {
 }
 .dims { color: var(--muted); font-variant-numeric: tabular-nums; }
 
+/* Recordings: a badge with the format and length over the thumbnail. */
+.badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 7px 3px 6px;
+  border-radius: 6px;
+  background: var(--bar-bg);
+  color: var(--bar-fg);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.badge svg { width: 11px; height: 11px; fill: currentColor; stroke: none; }
+.card.missing .thumb img { opacity: 0.35; }
+
 #empty {
   flex: 1;
   display: flex;

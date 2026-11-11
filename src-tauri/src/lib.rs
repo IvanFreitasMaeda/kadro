@@ -1,9 +1,11 @@
 mod capture;
 mod config;
+mod fileclip;
 mod gallery;
 mod history;
 #[cfg(target_os = "macos")]
 mod permissions;
+mod record;
 mod settings;
 mod shortcuts;
 mod tray;
@@ -22,6 +24,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(capture::CaptureState::default())
+        .manage(record::RecordState::default())
         .register_asynchronous_uri_scheme_protocol("kadro", capture::serve_shot)
         .invoke_handler(tauri::generate_handler![
             capture::copy_selection,
@@ -34,9 +37,13 @@ pub fn run() {
             history::history_save,
             history::history_save_as,
             history::history_open,
+            history::history_reveal,
             history::history_delete,
             history::history_clear,
             history::set_history_limit,
+            record::start_recording,
+            record::stop_recording,
+            record::recording_elapsed,
             settings::get_settings,
             settings::set_shortcut,
             settings::pause_shortcuts,

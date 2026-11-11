@@ -40,16 +40,36 @@ pub struct CaptureState {
 }
 
 /// Selection in screenshot pixels, sent by the overlay in the `x-kadro-rect` header.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize)]
 pub struct Rect {
-    x: u32,
-    y: u32,
-    width: u32,
-    height: u32,
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
+/// What the overlay is for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Mode {
+    /// Select an area to capture.
+    Area,
+    /// Capture, with the whole monitor under the cursor preselected.
+    Full,
+    /// Select the area to record.
+    Record,
 }
 
 /// Starts a capture. `full` preselects the whole monitor under the cursor.
 pub fn start(app: &AppHandle, full: bool) {
+    begin(app, if full { Mode::Full } else { Mode::Area });
+}
+
+/// Opens the overlay to pick the area to record.
+pub fn start_record(app: &AppHandle) {
+    begin(app, Mode::Record);
+}
+
+fn begin(app: &AppHandle, mode: Mode) {
     let state = app.state::<CaptureState>();
     if state.active.swap(true, Ordering::SeqCst) {
         return;
@@ -58,14 +78,14 @@ pub fn start(app: &AppHandle, full: bool) {
     // Capturing and building windows off the main thread keeps the event loop
     // responsive and avoids window-creation deadlocks on Windows.
     std::thread::spawn(move || {
-        if let Err(err) = open_overlays(&app, full) {
+        if let Err(err) = open_overlays(&app, mode) {
             log::error!("capture failed: {err}");
             close_all(&app);
         }
     });
 }
 
-fn open_overlays(app: &AppHandle, full: bool) -> Result<(), String> {
+fn open_overlays(app: &AppHandle, mode: Mode) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     if !crate::permissions::ensure_screen_capture(app) {
         app.state::<CaptureState>()
@@ -105,8 +125,10 @@ fn open_overlays(app: &AppHandle, full: bool) -> Result<(), String> {
                 && c.y < (pos.y + size.height as i32) as f64
         });
         let init = format!(
-            "window.__KADRO__ = {{ monitor: {i}, nonce: {nonce}, full: {} }};",
-            full && under_cursor
+            "window.__KADRO__ = {{ monitor: {i}, nonce: {nonce}, full: {}, record: {}, format: \"{}\" }};",
+            mode == Mode::Full && under_cursor,
+            mode == Mode::Record,
+            crate::record::last_format(app).ext(),
         );
         let builder = WebviewWindowBuilder::new(
             app,
@@ -276,12 +298,24 @@ pub(crate) fn encode_png(img: &RgbaImage, compression: CompressionType) -> Resul
     Ok(buf)
 }
 
-fn crop(app: &AppHandle, window: &WebviewWindow, rect: &Rect) -> Result<RgbaImage, String> {
-    let index: usize = window
+/// Which monitor an overlay window shows.
+pub(crate) fn overlay_index(window: &WebviewWindow) -> Result<usize, String> {
+    window
         .label()
         .strip_prefix(OVERLAY_PREFIX)
         .and_then(|s| s.parse().ok())
-        .ok_or("janela inválida")?;
+        .ok_or_else(|| "janela inválida".to_string())
+}
+
+/// Size in pixels of the screenshot shown by overlay `index`.
+pub(crate) fn shot_size(app: &AppHandle, index: usize) -> Option<(u32, u32)> {
+    let state = app.state::<CaptureState>();
+    let shots = state.shots.lock().unwrap();
+    shots.get(index).map(|img| img.dimensions())
+}
+
+fn crop(app: &AppHandle, window: &WebviewWindow, rect: &Rect) -> Result<RgbaImage, String> {
+    let index = overlay_index(window)?;
     let state = app.state::<CaptureState>();
     let shots = state.shots.lock().unwrap();
     let img = shots.get(index).ok_or("captura não encontrada")?;
@@ -298,17 +332,30 @@ fn write_png(img: &RgbaImage, path: &Path) -> Result<(), String> {
 }
 
 pub(crate) fn file_name(time: chrono::DateTime<chrono::Local>) -> String {
-    format!("Kadro {}.png", time.format("%Y-%m-%d às %H.%M.%S"))
+    file_name_ext(time, "png")
+}
+
+pub(crate) fn file_name_ext(time: chrono::DateTime<chrono::Local>, ext: &str) -> String {
+    format!("Kadro {}.{ext}", time.format("%Y-%m-%d às %H.%M.%S"))
 }
 
 /// Picks a file name in `dir`, for a capture taken at `time`, that doesn't exist yet.
 pub(crate) fn unique_path(dir: &Path, time: chrono::DateTime<chrono::Local>) -> PathBuf {
-    let name = file_name(time);
+    unique_path_ext(dir, time, "png")
+}
+
+/// Like `unique_path`, with another extension (recordings).
+pub(crate) fn unique_path_ext(
+    dir: &Path,
+    time: chrono::DateTime<chrono::Local>,
+    ext: &str,
+) -> PathBuf {
+    let name = file_name_ext(time, ext);
     let mut path = dir.join(&name);
-    let stem = name.trim_end_matches(".png").to_string();
+    let stem = name.trim_end_matches(&format!(".{ext}")).to_string();
     let mut n = 2;
     while path.exists() {
-        path = dir.join(format!("{stem} ({n}).png"));
+        path = dir.join(format!("{stem} ({n}).{ext}"));
         n += 1;
     }
     path

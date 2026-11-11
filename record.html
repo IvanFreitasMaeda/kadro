@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gravação do Kadro</title>
+    <link rel="stylesheet" href="/src/record.css" />
+  </head>
+  <body data-tauri-drag-region>
+    <div id="status" data-tauri-drag-region>
+      <span id="dot" data-tauri-drag-region></span>
+      <span id="time" data-tauri-drag-region>Preparando…</span>
+      <span id="format" data-tauri-drag-region></span>
+    </div>
+    <button id="stop" class="stop" disabled aria-label="Parar e salvar">
+      <svg viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2" /></svg>
+      Parar
+    </button>
+    <button id="discard" class="icon" aria-label="Descartar gravação">
+      <svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" /></svg>
+    </button>
+    <script type="module" src="/src/record.ts"></script>
+  </body>
+</html>

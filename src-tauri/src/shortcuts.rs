@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, Wry};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
-use crate::{capture, config, gallery, tray};
+use crate::{capture, config, gallery, record, tray};
 
 /// Select an area (Cmd+Shift+2 on macOS, Ctrl+Shift+2 on Windows).
 pub const DEFAULT_AREA: &str = "CommandOrControl+Shift+2";
@@ -12,6 +12,8 @@ pub const DEFAULT_AREA: &str = "CommandOrControl+Shift+2";
 pub const DEFAULT_FULL: &str = "CommandOrControl+Shift+1";
 /// History gallery. Not 3, 4 or 5: macOS uses Cmd+Shift+3/4/5 for its own screenshots.
 pub const DEFAULT_GALLERY: &str = "CommandOrControl+Shift+0";
+/// Start a recording, or stop the one running.
+pub const DEFAULT_RECORD: &str = "CommandOrControl+Shift+9";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -19,9 +21,10 @@ pub enum Kind {
     Area,
     Full,
     Gallery,
+    Record,
 }
 
-pub const ALL: [Kind; 3] = [Kind::Area, Kind::Full, Kind::Gallery];
+pub const ALL: [Kind; 4] = [Kind::Area, Kind::Full, Kind::Gallery, Kind::Record];
 
 /// The accelerator currently configured for `kind`.
 pub fn current(app: &AppHandle, kind: Kind) -> String {
@@ -31,6 +34,7 @@ pub fn current(app: &AppHandle, kind: Kind) -> String {
         Kind::Area => config.shortcut_area.clone(),
         Kind::Full => config.shortcut_full.clone(),
         Kind::Gallery => config.shortcut_gallery.clone(),
+        Kind::Record => config.shortcut_record.clone(),
     }
     .unwrap_or_else(|| default(kind).to_string())
 }
@@ -40,6 +44,7 @@ fn default(kind: Kind) -> &'static str {
         Kind::Area => DEFAULT_AREA,
         Kind::Full => DEFAULT_FULL,
         Kind::Gallery => DEFAULT_GALLERY,
+        Kind::Record => DEFAULT_RECORD,
     }
 }
 
@@ -61,6 +66,7 @@ pub fn plugin() -> tauri::plugin::TauriPlugin<Wry> {
             let app = app.app_handle();
             match kind_of(app, shortcut) {
                 Some(Kind::Gallery) => gallery::toggle(app),
+                Some(Kind::Record) => record::toggle(app),
                 Some(Kind::Full) => capture::start(app, true),
                 _ => capture::start(app, false),
             }
@@ -116,6 +122,7 @@ pub fn set(app: &AppHandle, kind: Kind, accelerator: Option<String>) -> Result<S
             Kind::Area => config.shortcut_area = value,
             Kind::Full => config.shortcut_full = value,
             Kind::Gallery => config.shortcut_gallery = value,
+            Kind::Record => config.shortcut_record = value,
         }
         config::store(app, &config)?;
     }

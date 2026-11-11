@@ -9,7 +9,7 @@ export default defineConfig({
     target: "es2022",
     minify: "esbuild",
     rollupOptions: {
-      input: { overlay: "overlay.html", settings: "settings.html", gallery: "gallery.html" },
+      input: { overlay: "overlay.html", settings: "settings.html", gallery: "gallery.html", record: "record.html" },
     },
   },
 });

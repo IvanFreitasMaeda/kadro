@@ -16,6 +16,10 @@ pub struct Config {
     pub shortcut_full: Option<String>,
     /// Global shortcut for the history gallery. `None` means the default.
     pub shortcut_gallery: Option<String>,
+    /// Global shortcut that starts and stops a recording. `None` means the default.
+    pub shortcut_record: Option<String>,
+    /// MP4 or GIF, as picked in the last recording.
+    pub record_format: Option<crate::record::Format>,
     /// How many recent captures the gallery keeps; 0 turns the history off.
     /// `None` means the default.
     pub history_limit: Option<usize>,
