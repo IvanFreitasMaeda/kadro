@@ -1,10 +1,13 @@
 name: Release
 
-# Publica uma release no GitHub quando uma tag de versão (ex.: v0.1.0) é enviada.
-# A versão da tag precisa ser igual à de src-tauri/tauri.conf.json.
+# Publica uma release no GitHub com os instaladores do Mac e do Windows.
+# Dois jeitos de disparar:
+#   - enviar uma tag de versão (ex.: v0.1.0), que precisa ser igual à de src-tauri/tauri.conf.json;
+#   - na aba Actions, "Run workflow" na main: usa a versão de tauri.conf.json e cria a tag sozinho.
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -30,14 +33,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Conferir versão da tag
+      - name: Conferir versão
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          tag="${GITHUB_REF_NAME#v}"
           app=$(node -p "require('./src-tauri/tauri.conf.json').version")
-          if [ "$tag" != "$app" ]; then
-            echo "::error::A tag ($GITHUB_REF_NAME) não bate com a versão do app ($app) em src-tauri/tauri.conf.json."
-            exit 1
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            if [ "${GITHUB_REF_NAME#v}" != "$app" ]; then
+              echo "::error::A tag ($GITHUB_REF_NAME) não bate com a versão do app ($app) em src-tauri/tauri.conf.json."
+              exit 1
+            fi
+          else
+            if [ "$GITHUB_REF_NAME" != "main" ]; then
+              echo "::error::Rode a release a partir da main."
+              exit 1
+            fi
+            if gh release view "v$app" >/dev/null 2>&1; then
+              echo "::error::A release v$app já existe. Suba a versão em src-tauri/tauri.conf.json antes."
+              exit 1
+            fi
           fi
 
       - uses: actions/setup-node@v4
@@ -94,7 +109,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           ls -l dist
-          gh release create "$GITHUB_REF_NAME" dist/* \
-            --title "Kadro ${GITHUB_REF_NAME}" \
+          tag="v$(node -p "require('./src-tauri/tauri.conf.json').version")"
+          gh release create "$tag" dist/* \
+            --target "$GITHUB_SHA" \
+            --title "Kadro $tag" \
             --generate-notes \
             --notes-file .github/release-notes.md
