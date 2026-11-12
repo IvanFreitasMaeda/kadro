@@ -1,0 +1,100 @@
+name: Release
+
+# Publica uma release no GitHub quando uma tag de versão (ex.: v0.1.0) é enviada.
+# A versão da tag precisa ser igual à de src-tauri/tauri.conf.json.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - name: macos-apple-silicon
+            runner: macos-latest
+            target: aarch64-apple-darwin
+          - name: windows-x64
+            runner: windows-latest
+            target: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Conferir versão da tag
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          app=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          if [ "$tag" != "$app" ]; then
+            echo "::error::A tag ($GITHUB_REF_NAME) não bate com a versão do app ($app) em src-tauri/tauri.conf.json."
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: ${{ matrix.target }}
+
+      - run: npm ci
+
+      - run: npx tauri build --target ${{ matrix.target }}
+
+      # Nomes fixos, sem a versão, para que os links "latest/download/..." do README sempre funcionem.
+      - name: Renomear instaladores
+        shell: bash
+        run: |
+          bundle="src-tauri/target/${{ matrix.target }}/release/bundle"
+          mkdir out
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            cp "$bundle"/dmg/*.dmg out/Kadro-macOS-AppleSilicon.dmg
+          else
+            cp "$bundle"/nsis/*.exe out/Kadro-Windows-Setup.exe
+            cp "$bundle"/msi/*.msi out/Kadro-Windows.msi
+          fi
+          ls -l out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kadro-${{ matrix.name }}
+          if-no-files-found: error
+          path: out/*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Criar a release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls -l dist
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "Kadro ${GITHUB_REF_NAME}" \
+            --generate-notes \
+            --notes-file .github/release-notes.md
