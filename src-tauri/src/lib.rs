@@ -9,6 +9,7 @@ mod record;
 mod settings;
 mod shortcuts;
 mod tray;
+mod updater;
 
 use std::sync::Mutex;
 
@@ -23,6 +24,7 @@ pub fn run() {
         .plugin(shortcuts::plugin())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(capture::CaptureState::default())
         .manage(record::RecordState::default())
         .register_asynchronous_uri_scheme_protocol("kadro", capture::serve_shot)
@@ -58,6 +60,7 @@ pub fn run() {
             app.manage(config::ConfigState(Mutex::new(config::load(handle))));
             tray::create(handle)?;
             shortcuts::register_all(handle);
+            updater::start(handle);
             Ok(())
         })
         .build(tauri::generate_context!())

@@ -27,6 +27,7 @@ Macs com processador Intel não são suportados. Depois de baixar, veja [Instala
 - Grave a tela inteira ou uma área em **MP4** ou **GIF**. Uma barrinha mostra o tempo e o botão de parar, e fica de fora do vídeo. A gravação vai para a pasta de capturas e aparece no histórico.
 - Atalhos, pasta de capturas e tamanho do histórico configuráveis em Preferências.
 - Funciona com vários monitores.
+- Se atualiza sozinho: avisa quando sai versão nova e instala com um clique.
 
 ## Atalhos
 
@@ -102,6 +103,8 @@ Rode o `Kadro-Windows-Setup.exe` (ou o `.msi`, se preferir). O SmartScreen pode 
 
 ## Atualizar ou desinstalar
 
+A partir da versão 0.2.0 o Kadro procura versões novas sozinho (ao abrir e uma vez por dia) e pergunta se você quer atualizar. Dá para procurar na hora em **Verificar atualizações…**, no menu do ícone. A atualização é baixada do GitHub, conferida pela assinatura e instalada, e o Kadro reinicia. No Mac, depois de atualizar, o macOS pede de novo a permissão de **Gravação de Tela**: libere, feche o Kadro pelo menu do ícone e abra de novo. Quem tem a 0.1.0 precisa instalar a 0.2.0 manualmente uma vez.
+
 Para instalar uma versão nova do zero, apague a anterior e os dados dela antes. Isso também apaga o histórico e as preferências. As capturas que você salvou na pasta `Imagens/Kadro` **não** são apagadas.
 
 **macOS** (no Terminal):
@@ -133,12 +136,15 @@ npm run tauri dev     # roda em modo desenvolvimento
 npm run tauri build   # gera o instalador em src-tauri/target/release/bundle
 ```
 
-Para publicar uma versão nova: suba o número da versão em `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` e `package.json`, faça o merge na `main` e crie a tag (`git tag v0.2.0 && git push origin v0.2.0`). O workflow `Release` gera os instaladores do Mac e do Windows e publica a release com eles. A cada PR o workflow `Build` também gera os instaladores, na aba **Actions**, para teste.
+Para publicar uma versão nova: suba o número da versão em `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` e `package.json`, faça o merge na `main` e rode **Actions → Release → Run workflow** (ou crie a tag, `git tag v0.2.0 && git push origin v0.2.0`). O workflow `Release` gera os instaladores do Mac e do Windows, os pacotes de atualização assinados e o `latest.json` que o app consulta, e publica tudo na release.
+
+A assinatura das atualizações usa uma chave privada guardada nos secrets do repositório (`TAURI_SIGNING_PRIVATE_KEY` e `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`); a chave pública correspondente está em `plugins.updater.pubkey`, no `tauri.conf.json`. Sem a chave privada não dá para publicar atualizações que as versões instaladas aceitem, então guarde uma cópia dela. A cada PR o workflow `Build` também gera os instaladores, na aba **Actions**, para teste.
 
 Estrutura:
 
 - `src-tauri/src/capture.rs`: captura dos monitores, janelas de seleção, recorte, copiar e salvar.
 - `src-tauri/src/tray.rs`: ícone e menu da bandeja.
+- `src-tauri/src/updater.rs`: procura, baixa e instala atualizações (GitHub Releases, `latest.json`).
 - `src-tauri/src/shortcuts.rs`: atalhos globais configuráveis.
 - `src-tauri/src/history.rs`: histórico de capturas (imagem ou gravação, e miniatura em disco).
 - `src-tauri/src/record/`: gravação de tela. `macos.rs` usa ScreenCaptureKit + AVAssetWriter, `windows.rs` usa Windows Graphics Capture + Media Foundation (os dois codificam H.264 com o codificador do próprio sistema), `gif.rs` monta o GIF.

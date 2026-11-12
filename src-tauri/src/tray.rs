@@ -11,6 +11,7 @@ use tauri_plugin_opener::OpenerExt;
 use crate::{
     capture, config, gallery, record, settings,
     shortcuts::{self, Kind},
+    updater,
 };
 
 /// Tray menu items whose accelerator label follows the configured shortcuts.
@@ -19,7 +20,10 @@ pub struct TrayItems {
     full: MenuItem<Wry>,
     gallery: MenuItem<Wry>,
     record: MenuItem<Wry>,
+    update: MenuItem<Wry>,
 }
+
+const UPDATE_LABEL: &str = "Verificar atualizações…";
 
 const TOOLTIP: &str = "Kadro: clique para capturar";
 const TOOLTIP_RECORDING: &str = "Kadro: gravando. Clique para parar";
@@ -53,6 +57,14 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         true,
         Some(shortcuts::current(app, Kind::Gallery)),
     )?;
+    let update = MenuItem::with_id(app, "update", UPDATE_LABEL, true, None::<&str>)?;
+    let version = MenuItem::with_id(
+        app,
+        "version",
+        format!("Kadro {}", app.package_info().version),
+        false,
+        None::<&str>,
+    )?;
     let menu = Menu::with_items(
         app,
         &[
@@ -70,6 +82,8 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
             )?,
             &MenuItem::with_id(app, "settings", "Preferências…", true, Some("CmdOrCtrl+,"))?,
             &PredefinedMenuItem::separator(app)?,
+            &version,
+            &update,
             &MenuItem::with_id(app, "quit", "Sair do Kadro", true, None::<&str>)?,
         ],
     )?;
@@ -78,6 +92,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         full,
         gallery,
         record,
+        update,
     });
 
     // macOS menu bar icons are monochrome "template" images; elsewhere use the app icon.
@@ -103,6 +118,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
             "gallery" => gallery::toggle(app),
             "open_dir" => open_save_dir(app),
             "settings" => settings::open(app),
+            "update" => updater::check_now(app),
             "quit" => app.exit(0),
             _ => {}
         })
@@ -169,4 +185,11 @@ pub fn set_recording(app: &AppHandle, recording: bool) {
             TOOLTIP
         }));
     }
+}
+
+/// Shows what the updater is doing in place of "Verificar atualizações…" (`None` restores it).
+pub fn set_updating(app: &AppHandle, status: Option<&str>) {
+    let item = &app.state::<TrayItems>().update;
+    let _ = item.set_text(status.unwrap_or(UPDATE_LABEL));
+    let _ = item.set_enabled(status.is_none());
 }

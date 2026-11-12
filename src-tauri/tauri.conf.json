@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Kadro",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "identifier": "io.github.ivanfreitasmaeda.kadro",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -31,6 +31,18 @@
     "macOS": {
       "minimumSystemVersion": "12.3",
       "signingIdentity": "-"
+    },
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDI2RDQ0ODBCRUVCRTQ0Q0EKUldUS1JMN3VDMGpVSm9zTVR2eTNGNm5zYWhyd2ZBa0FtMllmcnMrcXBhbmJ4N1haWHNWSE5YbWcK",
+      "endpoints": [
+        "https://github.com/IvanFreitasMaeda/kadro/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
     }
   }
 }
