@@ -43,7 +43,9 @@ jobs:
 
       - run: npm ci
 
-      - run: npx tauri build --target ${{ matrix.target }}
+      # Os pacotes de atualização assinados só saem na Release; aqui não precisa da chave.
+      - run: npx tauri build --target ${{ matrix.target }} --config '{"bundle":{"createUpdaterArtifacts":false}}'
+        shell: bash
 
       - uses: actions/upload-artifact@v4
         with:
