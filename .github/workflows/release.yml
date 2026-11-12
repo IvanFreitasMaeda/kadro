@@ -55,6 +55,16 @@ jobs:
             fi
           fi
 
+      - name: Conferir chave de assinatura das atualizações
+        shell: bash
+        env:
+          KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "::error::Falta o secret TAURI_SIGNING_PRIVATE_KEY (Settings → Secrets and variables → Actions). Sem ele o app não consegue se atualizar sozinho."
+            exit 1
+          fi
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -71,7 +81,12 @@ jobs:
 
       - run: npm ci
 
+      # Também gera os pacotes de atualização (.app.tar.gz no Mac, o setup .exe no Windows)
+      # e as assinaturas .sig que o app confere antes de instalar.
       - run: npx tauri build --target ${{ matrix.target }}
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
       # Nomes fixos, sem a versão, para que os links "latest/download/..." do README sempre funcionem.
       - name: Renomear instaladores
@@ -81,8 +96,11 @@ jobs:
           mkdir out
           if [ "${{ runner.os }}" = "macOS" ]; then
             cp "$bundle"/dmg/*.dmg out/Kadro-macOS-AppleSilicon.dmg
+            cp "$bundle"/macos/*.app.tar.gz out/Kadro-macOS-AppleSilicon.app.tar.gz
+            cp "$bundle"/macos/*.app.tar.gz.sig out/Kadro-macOS-AppleSilicon.app.tar.gz.sig
           else
             cp "$bundle"/nsis/*.exe out/Kadro-Windows-Setup.exe
+            cp "$bundle"/nsis/*.exe.sig out/Kadro-Windows-Setup.exe.sig
             cp "$bundle"/msi/*.msi out/Kadro-Windows.msi
           fi
           ls -l out
@@ -103,6 +121,34 @@ jobs:
         with:
           path: dist
           merge-multiple: true
+
+      # latest.json é o que o app consulta em releases/latest/download/latest.json
+      # para saber se há versão nova, de onde baixar e qual assinatura conferir.
+      - name: Gerar latest.json
+        env:
+          REPO: ${{ github.repository }}
+        run: |
+          node <<'EOF'
+          const fs = require('fs');
+          const version = require('./src-tauri/tauri.conf.json').version;
+          const base = `https://github.com/${process.env.REPO}/releases/download/v${version}`;
+          const entry = (file) => ({
+            signature: fs.readFileSync(`dist/${file}.sig`, 'utf8').trim(),
+            url: `${base}/${file}`,
+          });
+          const manifest = {
+            version,
+            notes: '',
+            pub_date: new Date().toISOString(),
+            platforms: {
+              'darwin-aarch64': entry('Kadro-macOS-AppleSilicon.app.tar.gz'),
+              'windows-x86_64': entry('Kadro-Windows-Setup.exe'),
+            },
+          };
+          fs.writeFileSync('dist/latest.json', JSON.stringify(manifest, null, 2));
+          EOF
+          rm dist/*.sig
+          cat dist/latest.json
 
       - name: Criar a release
         env:
