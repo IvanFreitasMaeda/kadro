@@ -58,6 +58,8 @@ pub fn run() {
 
             let handle = app.handle();
             app.manage(config::ConfigState(Mutex::new(config::load(handle))));
+            #[cfg(target_os = "macos")]
+            permissions::reset_after_update(handle);
             tray::create(handle)?;
             shortcuts::register_all(handle);
             updater::start(handle);

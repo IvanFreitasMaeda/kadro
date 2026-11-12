@@ -23,6 +23,8 @@ pub struct Config {
     /// How many recent captures the gallery keeps; 0 turns the history off.
     /// `None` means the default.
     pub history_limit: Option<usize>,
+    /// Kadro version of the last launch, to spot the first launch after an update.
+    pub last_version: Option<String>,
 }
 
 pub struct ConfigState(pub Mutex<Config>);

@@ -120,8 +120,6 @@ fn offer(app: &AppHandle, update: Update) {
     tray::set_updating(app, None);
     match installed {
         Ok(()) => {
-            #[cfg(target_os = "macos")]
-            reset_screen_permission(app);
             // On Windows the installer has already closed Kadro and reopens it itself.
             app.restart();
         }
@@ -132,20 +130,6 @@ fn offer(app: &AppHandle, update: Update) {
                 "Não deu para instalar a atualização. Tente de novo mais tarde ou baixe a versão nova em github.com/IvanFreitasMaeda/kadro/releases.",
             );
         }
-    }
-}
-
-/// Without an Apple signature, macOS sees each version as a new app: the old Screen
-/// Recording grant looks enabled but captures come back black. Clearing it makes macOS
-/// ask again on the next capture.
-#[cfg(target_os = "macos")]
-fn reset_screen_permission(app: &AppHandle) {
-    let id = &app.config().identifier;
-    if let Err(err) = std::process::Command::new("/usr/bin/tccutil")
-        .args(["reset", "ScreenCapture", id])
-        .status()
-    {
-        log::warn!("tccutil reset failed: {err}");
     }
 }
 
