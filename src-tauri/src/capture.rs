@@ -48,6 +48,17 @@ pub struct Rect {
     pub height: u32,
 }
 
+/// An area to pixelate, in screenshot pixels, sent in the `x-kadro-blur` header.
+/// `block` is the side of each pixel block.
+#[derive(Debug, Clone, Copy, Deserialize)]
+pub struct Blur {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+    pub block: u32,
+}
+
 /// What the overlay is for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mode {
@@ -314,7 +325,12 @@ pub(crate) fn shot_size(app: &AppHandle, index: usize) -> Option<(u32, u32)> {
     shots.get(index).map(|img| img.dimensions())
 }
 
-fn crop(app: &AppHandle, window: &WebviewWindow, rect: &Rect) -> Result<RgbaImage, String> {
+fn crop(
+    app: &AppHandle,
+    window: &WebviewWindow,
+    rect: &Rect,
+    blurs: &[Blur],
+) -> Result<RgbaImage, String> {
     let index = overlay_index(window)?;
     let state = app.state::<CaptureState>();
     let shots = state.shots.lock().unwrap();
@@ -323,7 +339,54 @@ fn crop(app: &AppHandle, window: &WebviewWindow, rect: &Rect) -> Result<RgbaImag
     let y = rect.y.min(img.height().saturating_sub(1));
     let w = rect.width.clamp(1, img.width() - x);
     let h = rect.height.clamp(1, img.height() - y);
-    Ok(imageops::crop_imm(img, x, y, w, h).to_image())
+    let mut out = imageops::crop_imm(img, x, y, w, h).to_image();
+    for blur in blurs {
+        pixelate(img, &mut out, (x, y), blur);
+    }
+    Ok(out)
+}
+
+/// Fills the part of `blur` that falls inside `out` with flat blocks, each the
+/// average colour of the screenshot under it. Blocks sit on a grid anchored at the
+/// screenshot's corner, the same grid the overlay uses for its preview, and are
+/// averaged over the whole block even where it reaches past the selection.
+/// `out` is the crop of `src` that starts at `origin`.
+fn pixelate(src: &RgbaImage, out: &mut RgbaImage, origin: (u32, u32), blur: &Blur) {
+    let b = blur.block.clamp(2, 512);
+    let (ox, oy) = origin;
+    let x0 = blur.x.max(ox);
+    let y0 = blur.y.max(oy);
+    let x1 = blur.x.saturating_add(blur.width).min(ox + out.width());
+    let y1 = blur.y.saturating_add(blur.height).min(oy + out.height());
+    if x0 >= x1 || y0 >= y1 {
+        return;
+    }
+    let mut by = y0 / b * b;
+    while by < y1 {
+        let ey = (by + b).min(src.height());
+        let mut bx = x0 / b * b;
+        while bx < x1 {
+            let ex = (bx + b).min(src.width());
+            let mut sum = [0u64; 4];
+            for py in by..ey {
+                for px in bx..ex {
+                    let p = src.get_pixel(px, py).0;
+                    for c in 0..4 {
+                        sum[c] += p[c] as u64;
+                    }
+                }
+            }
+            let n = (((ex - bx) * (ey - by)) as u64).max(1);
+            let color = image::Rgba(sum.map(|v| (v / n) as u8));
+            for py in by.max(y0)..ey.min(y1) {
+                for px in bx.max(x0)..ex.min(x1) {
+                    out.put_pixel(px - ox, py - oy, color);
+                }
+            }
+            bx += b;
+        }
+        by += b;
+    }
 }
 
 fn write_png(img: &RgbaImage, path: &Path) -> Result<(), String> {
@@ -381,6 +444,8 @@ pub(crate) fn copy_to_clipboard(app: &AppHandle, img: RgbaImage) -> Result<(), S
 
 /// Builds the final image from an overlay request: the selection comes in a header
 /// and the annotations, if any, as a transparent PNG of the same size in the body.
+/// Areas to pixelate come in another header and are applied before the annotations,
+/// so drawings on top of them stay sharp.
 fn compose(
     app: &AppHandle,
     window: &WebviewWindow,
@@ -392,7 +457,15 @@ fn compose(
         .and_then(|v| v.to_str().ok())
         .and_then(|v| serde_json::from_str(v).ok())
         .ok_or("seleção inválida")?;
-    let mut img = crop(app, window, &rect)?;
+    let blurs: Vec<Blur> = match request.headers().get("x-kadro-blur") {
+        Some(v) => v
+            .to_str()
+            .ok()
+            .and_then(|v| serde_json::from_str(v).ok())
+            .ok_or("área de desfoque inválida")?,
+        None => Vec::new(),
+    };
+    let mut img = crop(app, window, &rect, &blurs)?;
     if let InvokeBody::Raw(bytes) = request.body() {
         if !bytes.is_empty() {
             let ink = image::load_from_memory_with_format(bytes, ImageFormat::Png)

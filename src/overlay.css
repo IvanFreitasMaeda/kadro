@@ -133,6 +133,7 @@ html, body {
   stroke-linejoin: round;
 }
 .bar svg .dot { fill: currentColor; stroke: none; }
+.bar svg .fill { fill: currentColor; stroke: none; opacity: 0.55; }
 .bar .sep {
   width: 1px;
   height: 20px;

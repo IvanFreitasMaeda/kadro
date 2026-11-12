@@ -21,7 +21,7 @@ Macs com processador Intel não são suportados. Depois de baixar, veja [Instala
 - **Um clique** no ícone abre a captura. Clique direito mostra o menu.
 - Selecione uma área arrastando, ou pegue a tela inteira.
 - Ajuste a seleção depois: arraste para mover, use as alças para redimensionar.
-- Anote antes de copiar: lápis, marca-texto, linha, seta, retângulo, elipse e texto, com cores, três espessuras e desfazer/refazer.
+- Anote antes de copiar: lápis, marca-texto, desfoque (pixeliza dados sensíveis), linha, seta, retângulo, elipse e texto, com cores, três espessuras e desfazer/refazer.
 - Copie para a área de transferência ou salve em PNG numa pasta.
 - Histórico na lateral: as últimas capturas aparecem em miniatura, e um clique copia de novo. Dá para salvar, abrir ou remover cada uma dali.
 - Grave a tela inteira ou uma área em **MP4** ou **GIF**. Uma barrinha mostra o tempo e o botão de parar, e fica de fora do vídeo. A gravação vai para a pasta de capturas e aparece no histórico.
@@ -49,7 +49,7 @@ Dentro da captura:
 | `Ctrl/⌘ Shift S` | Salvar como… |
 | `F` ou `Ctrl/⌘ A` | Selecionar a tela inteira |
 | `Esc` ou clique direito | Cancelar |
-| `P` `M` `L` `A` `R` `E` `T` | Lápis, marca-texto, linha, seta, retângulo, elipse, texto (de novo para soltar) |
+| `P` `M` `B` `L` `A` `R` `E` `T` | Lápis, marca-texto, desfoque, linha, seta, retângulo, elipse, texto (de novo para soltar) |
 | `Shift` enquanto desenha | Trava o ângulo da linha/seta, faz quadrado ou círculo |
 | `Ctrl/⌘ Z` · `Ctrl/⌘ Shift Z` | Desfazer · refazer |
 

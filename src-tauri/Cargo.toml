@@ -1,6 +1,6 @@
 [package]
 name = "kadro"
-version = "0.2.0"
+version = "0.2.1"
 description = "Captura de tela rápida para macOS e Windows"
 authors = ["Ivan Freitas Maeda"]
 license = "MIT"

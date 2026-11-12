@@ -7,6 +7,7 @@ import {
   COLORS,
   LINE_HEIGHT,
   SIZES,
+  boxOf,
   drawAll,
   drawShape,
   font,
@@ -60,6 +61,7 @@ const textEdit = $<HTMLTextAreaElement>("text-edit");
 const TOOL_KEYS: Record<string, Tool> = {
   p: "pen",
   m: "marker",
+  b: "blur",
   l: "line",
   a: "arrow",
   r: "rect",
@@ -281,12 +283,70 @@ function drawInk() {
   inkCtx.clearRect(0, 0, w, h);
   if (!sel || sel.w <= 0 || sel.h <= 0) return;
   inkCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  drawAll(inkCtx, current ? [...shapes, current] : shapes, sel);
+  drawAll(inkCtx, current ? [...shapes, current] : shapes, sel, drawBlur);
+}
+
+// Blur: the area is pixelated, which hides text for good, unlike a soft blur that
+// can sometimes be undone. The preview draws a scaled-down copy of the screenshot
+// back up without smoothing; the Rust side does the same with exact averages when
+// the image is copied or saved, on the same grid of blocks.
+
+/** Side of a blur shape's blocks in screenshot pixels. */
+const blockPx = (s: { block: number }) => Math.max(2, Math.round((s.block * shot.naturalWidth) / vw()));
+
+/** The screenshot shrunk so each pixel stands for one block, per block size. */
+const mosaics = new Map<number, HTMLCanvasElement>();
+
+function mosaic(block: number) {
+  let c = mosaics.get(block);
+  if (!c) {
+    c = document.createElement("canvas");
+    c.width = Math.ceil(shot.naturalWidth / block);
+    c.height = Math.ceil(shot.naturalHeight / block);
+    const cx = c.getContext("2d")!;
+    cx.imageSmoothingQuality = "high";
+    cx.drawImage(shot, 0, 0, shot.naturalWidth / block, shot.naturalHeight / block);
+    mosaics.set(block, c);
+  }
+  return c;
+}
+
+function drawBlur(ctx: CanvasRenderingContext2D, s: Extract<Shape, { kind: "blur" }>) {
+  const r = boxOf(s);
+  const block = blockPx(s);
+  const m = mosaic(block);
+  // Screenshot pixels to CSS pixels.
+  const kx = vw() / shot.naturalWidth;
+  const ky = vh() / shot.naturalHeight;
+  const i0 = clamp(Math.floor(r.x / kx / block), 0, m.width);
+  const j0 = clamp(Math.floor(r.y / ky / block), 0, m.height);
+  const i1 = clamp(Math.ceil((r.x + r.w) / kx / block), 0, m.width);
+  const j1 = clamp(Math.ceil((r.y + r.h) / ky / block), 0, m.height);
+  if (i1 <= i0 || j1 <= j0) return;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(r.x, r.y, r.w, r.h);
+  ctx.clip();
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(
+    m,
+    i0,
+    j0,
+    i1 - i0,
+    j1 - j0,
+    i0 * block * kx,
+    j0 * block * ky,
+    (i1 - i0) * block * kx,
+    (j1 - j0) * block * ky,
+  );
+  ctx.restore();
 }
 
 function startShape(p: Pt) {
   const size = SIZES[sizeIdx];
-  if (tool === "pen" || tool === "marker") {
+  if (tool === "blur") {
+    current = { kind: "blur", block: size.blur, a: p, b: p };
+  } else if (tool === "pen" || tool === "marker") {
     current = {
       kind: tool,
       color,
@@ -307,7 +367,8 @@ function updateShape(p: Pt) {
     current.pts.push(p);
   } else if ("b" in current) {
     if (!shiftDown) current.b = p;
-    else if (current.kind === "rect" || current.kind === "ellipse") current.b = snapSquare(current.a, p);
+    else if (current.kind === "rect" || current.kind === "ellipse" || current.kind === "blur")
+      current.b = snapSquare(current.a, p);
     else current.b = snapAngle(current.a, p);
   }
   drawInk();
@@ -462,7 +523,8 @@ function cancelText() {
 
 /** Renders the annotations at the screenshot's resolution, cropped to `img`. */
 async function inkPng(img: { x: number; y: number; width: number; height: number }) {
-  if (shapes.length === 0) return new Uint8Array();
+  // Blurred areas are applied by the Rust side, straight on the screenshot.
+  if (shapes.every((s) => s.kind === "blur")) return new Uint8Array();
   const canvas = document.createElement("canvas");
   canvas.width = img.width;
   canvas.height = img.height;
@@ -528,7 +590,12 @@ async function run(action: string) {
     // The annotations travel as a PNG in the request body and the selection in a
     // header; the Rust side crops the screenshot and lays the annotations on top.
     const body = await inkPng(rect);
-    const options = { headers: { "x-kadro-rect": JSON.stringify(rect) } };
+    const headers: Record<string, string> = { "x-kadro-rect": JSON.stringify(rect) };
+    const blurs = shapes.flatMap((s) =>
+      s.kind === "blur" ? [{ ...toImageRect(boxOf(s)), block: blockPx(s) }] : [],
+    );
+    if (blurs.length) headers["x-kadro-blur"] = JSON.stringify(blurs);
+    const options = { headers };
     if (action === "copy") {
       await invoke("copy_selection", body, options);
     } else if (action === "save") {
