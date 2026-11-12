@@ -2,14 +2,16 @@
 // pixels of the overlay window, so the same code draws them on screen and, with a
 // scale transform, on the full-resolution image that gets copied or saved.
 
-export type Tool = "pen" | "marker" | "line" | "arrow" | "rect" | "ellipse" | "text";
+export type Tool = "pen" | "marker" | "line" | "arrow" | "rect" | "ellipse" | "text" | "blur";
 export type Pt = { x: number; y: number };
 export type Rect = { x: number; y: number; w: number; h: number };
 
 export type Shape =
   | { kind: "pen" | "marker"; color: string; width: number; pts: Pt[] }
   | { kind: "line" | "arrow" | "rect" | "ellipse"; color: string; width: number; a: Pt; b: Pt }
-  | { kind: "text"; color: string; size: number; at: Pt; text: string };
+  | { kind: "text"; color: string; size: number; at: Pt; text: string }
+  // `block` is the side of the pixel blocks, in CSS pixels.
+  | { kind: "blur"; block: number; a: Pt; b: Pt };
 
 export const COLORS = [
   "#ff3b30",
@@ -22,11 +24,11 @@ export const COLORS = [
   "#1c1c1e",
 ];
 
-/** Thickness presets: line width, highlighter width and font size for each. */
+/** Thickness presets: line width, highlighter width, font size and blur block size. */
 export const SIZES = [
-  { name: "Fina", stroke: 2, marker: 10, font: 16 },
-  { name: "Média", stroke: 4, marker: 18, font: 22 },
-  { name: "Grossa", stroke: 8, marker: 30, font: 32 },
+  { name: "Fina", stroke: 2, marker: 10, font: 16, blur: 6 },
+  { name: "Média", stroke: 4, marker: 18, font: 22, blur: 10 },
+  { name: "Grossa", stroke: 8, marker: 30, font: 32, blur: 16 },
 ];
 
 export const MARKER_ALPHA = 0.4;
@@ -97,7 +99,19 @@ function arrow(ctx: CanvasRenderingContext2D, a: Pt, b: Pt, width: number) {
   ctx.fill();
 }
 
+/** Normalized box of a two-point shape. */
+export function boxOf(s: { a: Pt; b: Pt }): Rect {
+  return {
+    x: Math.min(s.a.x, s.b.x),
+    y: Math.min(s.a.y, s.b.y),
+    w: Math.abs(s.b.x - s.a.x),
+    h: Math.abs(s.b.y - s.a.y),
+  };
+}
+
 export function drawShape(ctx: CanvasRenderingContext2D, s: Shape) {
+  // Blur needs the screenshot's pixels: the overlay draws it with `drawAll`'s callback.
+  if (s.kind === "blur") return;
   ctx.save();
   ctx.strokeStyle = s.color;
   ctx.fillStyle = s.color;
@@ -158,14 +172,25 @@ export function drawShape(ctx: CanvasRenderingContext2D, s: Shape) {
   ctx.restore();
 }
 
-/** Draws every shape, clipped to `clip` when given. */
-export function drawAll(ctx: CanvasRenderingContext2D, shapes: Shape[], clip?: Rect) {
+type BlurShape = Extract<Shape, { kind: "blur" }>;
+
+/**
+ * Draws every shape, clipped to `clip` when given. Blurred areas go first, through
+ * `blur`, so the other annotations stay sharp on top of them, as in the saved image.
+ */
+export function drawAll(
+  ctx: CanvasRenderingContext2D,
+  shapes: Shape[],
+  clip?: Rect,
+  blur?: (ctx: CanvasRenderingContext2D, s: BlurShape) => void,
+) {
   ctx.save();
   if (clip) {
     ctx.beginPath();
     ctx.rect(clip.x, clip.y, clip.w, clip.h);
     ctx.clip();
   }
+  if (blur) for (const s of shapes) if (s.kind === "blur") blur(ctx, s);
   for (const s of shapes) drawShape(ctx, s);
   ctx.restore();
 }
