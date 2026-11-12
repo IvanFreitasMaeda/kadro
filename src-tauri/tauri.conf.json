@@ -36,7 +36,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDA0N0M2ODA3RUE1NjE1RjAKUldUd0ZWYnFCMmg4QkcvL0Mrbm9xbEwzZUpzWlRYRUxpRlUxV21VKytPL2NDclFobitLc1ozd1oK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDI2RDQ0ODBCRUVCRTQ0Q0EKUldUS1JMN3VDMGpVSm9zTVR2eTNGNm5zYWhyd2ZBa0FtMllmcnMrcXBhbmJ4N1haWHNWSE5YbWcK",
       "endpoints": [
         "https://github.com/IvanFreitasMaeda/kadro/releases/latest/download/latest.json"
       ],
