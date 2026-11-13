@@ -2413,7 +2413,7 @@ dependencies = [
 
 [[package]]
 name = "kadro"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "arboard",
  "block2",
