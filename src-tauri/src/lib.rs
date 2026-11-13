@@ -1,3 +1,4 @@
+mod autostart;
 mod capture;
 mod config;
 mod fileclip;
@@ -25,6 +26,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(autostart::plugin())
         .manage(capture::CaptureState::default())
         .manage(record::RecordState::default())
         .register_asynchronous_uri_scheme_protocol("kadro", capture::serve_shot)
@@ -51,6 +53,7 @@ pub fn run() {
             settings::pause_shortcuts,
             settings::choose_save_dir,
             settings::open_support_page,
+            autostart::set_autostart,
         ])
         .setup(|app| {
             // Menu bar app: no Dock icon on macOS.
@@ -61,6 +64,7 @@ pub fn run() {
             app.manage(config::ConfigState(Mutex::new(config::load(handle))));
             #[cfg(target_os = "macos")]
             permissions::reset_after_update(handle);
+            autostart::init(handle);
             tray::create(handle)?;
             shortcuts::register_all(handle);
             updater::start(handle);

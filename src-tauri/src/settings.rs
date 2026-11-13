@@ -1,11 +1,11 @@
-//! Preferences window: shortcuts and the captures folder.
+//! Preferences window: launch at login, shortcuts and the captures folder.
 
 use serde::Serialize;
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 
-use crate::{config, history, shortcuts};
+use crate::{autostart, config, history, shortcuts};
 
 const LABEL: &str = "settings";
 
@@ -35,7 +35,7 @@ pub fn open(app: &AppHandle) {
     }
     let result = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("settings.html".into()))
         .title("Preferências do Kadro")
-        .inner_size(480.0, 456.0)
+        .inner_size(480.0, 536.0)
         .resizable(false)
         .maximizable(false)
         .minimizable(false)
@@ -58,6 +58,7 @@ pub struct Settings {
     shortcut_record: String,
     history_limit: usize,
     save_dir: String,
+    autostart: bool,
     platform: &'static str,
 }
 
@@ -71,6 +72,7 @@ pub fn get_settings(app: AppHandle) -> Settings {
         shortcut_record: shortcuts::current(&app, shortcuts::Kind::Record),
         history_limit: history::limit(&app),
         save_dir: save_dir.display().to_string(),
+        autostart: autostart::enabled(&app),
         platform: std::env::consts::OS,
     }
 }
