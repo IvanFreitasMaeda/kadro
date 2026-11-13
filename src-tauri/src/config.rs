@@ -25,6 +25,9 @@ pub struct Config {
     pub history_limit: Option<usize>,
     /// Kadro version of the last launch, to spot the first launch after an update.
     pub last_version: Option<String>,
+    /// Set once launch at login was turned on by default (or changed by hand), so it
+    /// is never forced back on after the user turns it off.
+    pub autostart_initialized: bool,
 }
 
 pub struct ConfigState(pub Mutex<Config>);

@@ -112,3 +112,12 @@ kbd {
   font: inherit;
   font-size: 11px;
 }
+
+label.row { cursor: pointer; }
+input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0 4px 0 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}

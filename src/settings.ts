@@ -1,4 +1,4 @@
-// Preferences window: record global shortcuts, pick the captures folder and the
+// Preferences window: launch at login, record global shortcuts, pick the captures folder and the
 // history size.
 import { invoke } from "@tauri-apps/api/core";
 import { pretty as prettyFor } from "./keys";
@@ -11,6 +11,7 @@ type Settings = {
   shortcut_record: string;
   history_limit: number;
   save_dir: string;
+  autostart: boolean;
   platform: string;
 };
 
@@ -25,6 +26,7 @@ let isMac = navigator.userAgent.includes("Mac");
 const pretty = (accelerator: string) => prettyFor(accelerator, isMac);
 let recording: Kind | null = null;
 const values: Record<Kind, string> = { area: "", full: "", gallery: "", record: "" };
+const autostartEl = document.getElementById("autostart") as HTMLInputElement;
 const historyEl = document.getElementById("history-limit") as HTMLSelectElement;
 const DEFAULT_HINT = status.innerHTML;
 
@@ -133,6 +135,20 @@ historyEl.addEventListener("change", async () => {
     showStatus(String(err), "error");
   }
 });
+autostartEl.addEventListener("change", async () => {
+  try {
+    autostartEl.checked = await invoke<boolean>("set_autostart", { enabled: autostartEl.checked });
+    showStatus(
+      autostartEl.checked
+        ? "O Kadro vai abrir sozinho, na bandeja, quando você entrar no sistema."
+        : "O Kadro não abre mais junto com o sistema.",
+      "ok",
+    );
+  } catch (err) {
+    autostartEl.checked = !autostartEl.checked;
+    showStatus(String(err), "error");
+  }
+});
 window.addEventListener("blur", () => {
   if (recording) void stopRecording();
 });
@@ -149,6 +165,7 @@ async function init() {
     historyEl.add(new Option(`Últimas ${s.history_limit}`, String(s.history_limit)));
   }
   historyEl.value = String(s.history_limit);
+  autostartEl.checked = s.autostart;
   dirEl.textContent = `\u200e${s.save_dir}\u200e`;
   dirEl.title = s.save_dir;
   render();
