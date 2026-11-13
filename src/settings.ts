@@ -153,6 +153,10 @@ window.addEventListener("blur", () => {
   if (recording) void stopRecording();
 });
 
+document.getElementById("support")!.addEventListener("click", () => {
+  void invoke("open_support_page");
+});
+
 async function init() {
   const s = await invoke<Settings>("get_settings");
   isMac = s.platform === "macos";

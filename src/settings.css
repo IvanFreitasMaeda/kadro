@@ -113,6 +113,16 @@ kbd {
   font-size: 11px;
 }
 
+footer { text-align: center; color: var(--muted); font-size: 12px; }
+button.link {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  font-size: inherit;
+}
+button.link:hover { text-decoration: underline; }
+
 label.row { cursor: pointer; }
 input[type="checkbox"] {
   width: 16px;

@@ -52,6 +52,7 @@ pub fn run() {
             settings::set_shortcut,
             settings::pause_shortcuts,
             settings::choose_save_dir,
+            settings::open_support_page,
             autostart::set_autostart,
         ])
         .setup(|app| {
