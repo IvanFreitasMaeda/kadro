@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/banner.png" alt="Kadro: capture, anote e grave sua tela em um atalho" width="100%"></p>
+
 # Kadro
 
 Captura de tela simples e rápida para macOS e Windows, inspirada no Lightshot e no CleanShot.
