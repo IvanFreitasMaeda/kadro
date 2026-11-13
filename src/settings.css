@@ -112,3 +112,13 @@ kbd {
   font: inherit;
   font-size: 11px;
 }
+
+footer { text-align: center; color: var(--muted); font-size: 12px; }
+button.link {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  font-size: inherit;
+}
+button.link:hover { text-decoration: underline; }

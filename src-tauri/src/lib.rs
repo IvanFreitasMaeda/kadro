@@ -50,6 +50,7 @@ pub fn run() {
             settings::set_shortcut,
             settings::pause_shortcuts,
             settings::choose_save_dir,
+            settings::open_support_page,
         ])
         .setup(|app| {
             // Menu bar app: no Dock icon on macOS.
