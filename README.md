@@ -2,6 +2,8 @@
 
 Captura de tela simples e rápida para macOS e Windows, inspirada no Lightshot e no CleanShot.
 
+[![Apoie no Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-apoiar-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/ivanmaeda)
+
 Feito com [Tauri 2](https://v2.tauri.app) (Rust + TypeScript), para ser leve: o instalador fica na casa de poucos MB.
 
 ## Download
@@ -157,6 +159,14 @@ Estrutura:
 - `src/gallery.ts`: interface do histórico.
 - `src/record.ts`: barrinha de controle da gravação.
 - `src/settings.ts`: interface das preferências.
+
+## Apoiar o projeto
+
+O Kadro é gratuito. Se ele te ajuda e você quiser apoiar o desenvolvimento, pode me pagar um café:
+
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-apoiar-FFDD00?logo=buymeacoffee&logoColor=black&style=for-the-badge)](https://buymeacoffee.com/ivanmaeda)
+
+O link também fica no menu do Kadro (**Apoiar o Kadro ☕**) e no rodapé das Preferências.
 
 ## Créditos
 

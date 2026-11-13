@@ -84,6 +84,8 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
             &PredefinedMenuItem::separator(app)?,
             &version,
             &update,
+            &MenuItem::with_id(app, "support", "Apoiar o Kadro ☕", true, None::<&str>)?,
+            &PredefinedMenuItem::separator(app)?,
             &MenuItem::with_id(app, "quit", "Sair do Kadro", true, None::<&str>)?,
         ],
     )?;
@@ -119,6 +121,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
             "open_dir" => open_save_dir(app),
             "settings" => settings::open(app),
             "update" => updater::check_now(app),
+            "support" => settings::open_support(app),
             "quit" => app.exit(0),
             _ => {}
         })

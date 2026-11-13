@@ -3,10 +3,28 @@
 use serde::Serialize;
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_opener::OpenerExt;
 
 use crate::{config, history, shortcuts};
 
 const LABEL: &str = "settings";
+
+/// Where people can support the project (Buy Me a Coffee).
+const SUPPORT_URL: &str = "https://buymeacoffee.com/ivanmaeda";
+
+/// Opens the support page in the default browser.
+pub fn open_support(app: &AppHandle) {
+    if let Err(err) = app.opener().open_url(SUPPORT_URL, None::<&str>) {
+        log::error!("could not open the support page: {err}");
+    }
+}
+
+/// Same as [`open_support`], for the "Apoiar o projeto" link in Preferences. The URL is
+/// fixed here, so the window cannot open arbitrary links.
+#[tauri::command]
+pub fn open_support_page(app: AppHandle) {
+    open_support(&app);
+}
 
 pub fn open(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(LABEL) {
@@ -17,7 +35,7 @@ pub fn open(app: &AppHandle) {
     }
     let result = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("settings.html".into()))
         .title("Preferências do Kadro")
-        .inner_size(480.0, 420.0)
+        .inner_size(480.0, 456.0)
         .resizable(false)
         .maximizable(false)
         .minimizable(false)
