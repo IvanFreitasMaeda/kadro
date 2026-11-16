@@ -224,7 +224,7 @@ fn shareable_content() -> Result<Retained<SCShareableContent>, String> {
     });
     unsafe {
         SCShareableContent::getShareableContentExcludingDesktopWindows_onScreenWindowsOnly_completionHandler(
-            false, true, &block,
+            false, false, &block,
         );
     }
     rx.recv_timeout(TIMEOUT)
@@ -316,31 +316,23 @@ pub fn start(target: &Target, feed: Arc<Feed>) -> Result<Box<dyn Backend>, Strin
             .find(|d| d.displayID() == target.monitor.id)
             .ok_or("monitor não encontrado")?;
 
-        // Leave Kadro out: by app when macOS lists it, otherwise window by window.
-        let apps: Vec<_> = content
-            .applications()
+        // Leave Kadro's windows out one by one (the control bar, the menu bar icon,
+        // hidden overlays) instead of excluding the whole app. A filter that excludes
+        // an application also drops the context menus and popups that show up while
+        // recording, Kadro's own tray menu included. With a window list, windows that
+        // open later (any app's menus) are captured. Kadro's popup menus are kept,
+        // since AppKit may reuse a menu window that already exists.
+        let windows: Vec<_> = content
+            .windows()
             .iter()
-            .filter(|a| a.processID() == pid)
+            .filter(|w| w.owningApplication().is_some_and(|a| a.processID() == pid))
+            .filter(|w| w.windowLayer() != POPUP_MENU_LAYER)
             .collect();
-        let filter = if apps.is_empty() {
-            let windows: Vec<_> = content
-                .windows()
-                .iter()
-                .filter(|w| w.owningApplication().is_some_and(|a| a.processID() == pid))
-                .collect();
-            SCContentFilter::initWithDisplay_excludingWindows(
-                SCContentFilter::alloc(),
-                &display,
-                &NSArray::from_retained_slice(&windows),
-            )
-        } else {
-            SCContentFilter::initWithDisplay_excludingApplications_exceptingWindows(
-                SCContentFilter::alloc(),
-                &display,
-                &NSArray::from_retained_slice(&apps),
-                &NSArray::new(),
-            )
-        };
+        let filter = SCContentFilter::initWithDisplay_excludingWindows(
+            SCContentFilter::alloc(),
+            &display,
+            &NSArray::from_retained_slice(&windows),
+        );
 
         // The selection is in screenshot pixels; ScreenCaptureKit wants points.
         let s = target.monitor.px_per_unit.max(0.01);
@@ -402,6 +394,9 @@ pub fn start(target: &Target, feed: Arc<Feed>) -> Result<Box<dyn Backend>, Strin
 
 #[allow(non_camel_case_types)]
 type libc_pid = i32;
+
+/// `kCGPopUpMenuWindowLevel`: the layer of context menus and menu bar menus.
+const POPUP_MENU_LAYER: isize = 101;
 
 impl MacBackend {
     /// Waits until the capture queue has handled every frame it already received.
