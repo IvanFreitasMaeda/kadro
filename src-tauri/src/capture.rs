@@ -24,7 +24,7 @@ use tauri::{
 };
 use tauri_plugin_dialog::DialogExt;
 
-use crate::{config, gallery, history};
+use crate::{config, gallery, history, ocr};
 
 const OVERLAY_PREFIX: &str = "overlay-";
 
@@ -68,11 +68,18 @@ enum Mode {
     Full,
     /// Select the area to record.
     Record,
+    /// Select an area and copy the text in it.
+    Text,
 }
 
 /// Starts a capture. `full` preselects the whole monitor under the cursor.
 pub fn start(app: &AppHandle, full: bool) {
     begin(app, if full { Mode::Full } else { Mode::Area });
+}
+
+/// Opens the overlay to pick an area whose text gets copied.
+pub fn start_text(app: &AppHandle) {
+    begin(app, Mode::Text);
 }
 
 /// Opens the overlay to pick the area to record.
@@ -136,9 +143,10 @@ fn open_overlays(app: &AppHandle, mode: Mode) -> Result<(), String> {
                 && c.y < (pos.y + size.height as i32) as f64
         });
         let init = format!(
-            "window.__KADRO__ = {{ monitor: {i}, nonce: {nonce}, full: {}, record: {}, format: \"{}\" }};",
+            "window.__KADRO__ = {{ monitor: {i}, nonce: {nonce}, full: {}, record: {}, ocr: {}, format: \"{}\" }};",
             mode == Mode::Full && under_cursor,
             mode == Mode::Record,
+            mode == Mode::Text,
             crate::record::last_format(app).ext(),
         );
         let builder = WebviewWindowBuilder::new(
@@ -451,6 +459,25 @@ fn compose(
     window: &WebviewWindow,
     request: &Request<'_>,
 ) -> Result<RgbaImage, String> {
+    let mut img = crop_request(app, window, request)?;
+    if let InvokeBody::Raw(bytes) = request.body() {
+        if !bytes.is_empty() {
+            let ink = image::load_from_memory_with_format(bytes, ImageFormat::Png)
+                .map_err(|e| format!("anotações inválidas: {e}"))?
+                .to_rgba8();
+            imageops::overlay(&mut img, &ink, 0, 0);
+        }
+    }
+    Ok(img)
+}
+
+/// The selection named in an overlay request's headers, with its blurred areas
+/// applied, without the annotations.
+fn crop_request(
+    app: &AppHandle,
+    window: &WebviewWindow,
+    request: &Request<'_>,
+) -> Result<RgbaImage, String> {
     let rect: Rect = request
         .headers()
         .get("x-kadro-rect")
@@ -465,16 +492,7 @@ fn compose(
             .ok_or("área de desfoque inválida")?,
         None => Vec::new(),
     };
-    let mut img = crop(app, window, &rect, &blurs)?;
-    if let InvokeBody::Raw(bytes) = request.body() {
-        if !bytes.is_empty() {
-            let ink = image::load_from_memory_with_format(bytes, ImageFormat::Png)
-                .map_err(|e| format!("anotações inválidas: {e}"))?
-                .to_rgba8();
-            imageops::overlay(&mut img, &ink, 0, 0);
-        }
-    }
-    Ok(img)
+    crop(app, window, &rect, &blurs)
 }
 
 #[tauri::command]
@@ -532,6 +550,38 @@ pub async fn save_selection_as(
         path
     };
     write_png(&img, &path)
+}
+
+/// Reads the text in the selection, skipping blurred areas (they are pixelated
+/// first). Word boxes are in pixels of the selection.
+#[tauri::command]
+pub async fn recognize_text(
+    app: AppHandle,
+    window: WebviewWindow,
+    request: Request<'_>,
+) -> Result<Vec<ocr::Line>, String> {
+    let img = crop_request(&app, &window, &request)?;
+    tauri::async_runtime::spawn_blocking(move || ocr::recognize(&img))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Copies text recognized in a capture. `close` also closes the overlays.
+#[tauri::command]
+pub async fn copy_text(app: AppHandle, text: String, close: bool) -> Result<(), String> {
+    if close {
+        close_all(&app);
+    }
+    let state = app.state::<CaptureState>();
+    let mut guard = state.clipboard.lock().unwrap();
+    if guard.is_none() {
+        *guard = Some(arboard::Clipboard::new().map_err(|e| e.to_string())?);
+    }
+    guard
+        .as_mut()
+        .unwrap()
+        .set_text(text)
+        .map_err(|e| format!("não foi possível copiar: {e}"))
 }
 
 #[tauri::command]

@@ -1,6 +1,6 @@
 [package]
 name = "kadro"
-version = "0.2.4"
+version = "0.2.5"
 description = "Captura de tela rápida para macOS e Windows"
 authors = ["Ivan Freitas Maeda"]
 license = "MIT"
@@ -31,6 +31,7 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 dirs = "6"
 percent-encoding = "2"
 log = "0.4"
+# OCR uses the OS (Vision on macOS, Windows.Media.Ocr on Windows): no models bundled.
 # GIF encoding for recordings (MIT/Apache, quantizes with NeuQuant).
 gif = "0.14"
 
@@ -38,18 +39,25 @@ gif = "0.14"
 objc2 = "0.6"
 block2 = "0.6"
 dispatch2 = "0.3"
-objc2-foundation = { version = "0.3", features = ["NSArray", "NSDictionary", "NSError", "NSString", "NSURL", "NSValue"] }
+objc2-foundation = { version = "0.3", features = ["NSArray", "NSData", "NSDictionary", "NSError", "NSRange", "NSString", "NSURL", "NSValue"] }
 objc2-screen-capture-kit = "0.3"
 objc2-av-foundation = { version = "0.3", features = ["AVAssetWriter", "AVAssetWriterInput", "AVMediaFormat", "AVVideoSettings"] }
 objc2-core-media = { version = "0.3", features = ["CMSampleBuffer", "CMTime"] }
 objc2-core-video = { version = "0.3", features = ["CVBuffer", "CVImageBuffer", "CVPixelBuffer", "CVReturn"] }
 objc2-core-foundation = { version = "0.3", features = ["CFCGTypes"] }
+objc2-vision = { version = "0.3", default-features = false, features = ["std", "VNRequest", "VNRequestHandler", "VNObservation", "VNRecognizeTextRequest", "VNTypes", "objc2-core-foundation"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows-capture = "2"
 windows = { version = "0.62", features = [
+  "Foundation_Collections",
+  "Globalization",
+  "Graphics_Imaging",
+  "Media_Ocr",
+  "Storage_Streams",
   "Win32_Foundation",
   "Win32_Graphics_Gdi",
+  "Win32_System_Com",
   "Win32_System_DataExchange",
   "Win32_System_Memory",
   "Win32_System_Ole",

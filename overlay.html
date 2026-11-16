@@ -20,6 +20,7 @@
       <div class="handle" data-h="sw"></div>
       <div class="handle" data-h="w"></div>
     </div>
+    <div id="ocr" hidden></div>
     <textarea id="text-edit" wrap="off" spellcheck="false" hidden></textarea>
     <div id="size" hidden></div>
     <div id="hint">
@@ -36,6 +37,9 @@
       </div>
       <button data-action="record" class="rec-only record-btn" data-tip="Começar a gravar (Enter)" aria-label="Começar a gravar (Enter)">
         <span class="rec-dot"></span>Gravar
+      </button>
+      <button data-action="copytext" class="text-only copytext-btn" data-tip="Copiar todo o texto (Enter ou Ctrl+C)" aria-label="Copiar todo o texto (Enter ou Ctrl+C)">
+        <svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></svg><span>Copiar tudo</span>
       </button>
       <button data-action="copy" class="shot-only" data-tip="Copiar (Enter ou Ctrl+C)" aria-label="Copiar (Enter ou Ctrl+C)">
         <svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></svg>
@@ -75,6 +79,10 @@
       </button>
       <button data-tool="text" data-tip="Texto (T)" aria-label="Texto (T)">
         <svg viewBox="0 0 24 24"><path d="M5 6V4h14v2M12 4v16M9 20h6" /></svg>
+      </button>
+      <span class="sep"></span>
+      <button data-action="ocr" data-tip="Selecionar texto (O)" aria-label="Selecionar texto (O)">
+        <svg viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" /><path d="M8.5 9h7M12 9v7" /></svg>
       </button>
       <span class="sep"></span>
       <button data-action="color" data-tip="Cor" aria-label="Cor">

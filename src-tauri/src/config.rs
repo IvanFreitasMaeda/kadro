@@ -18,6 +18,8 @@ pub struct Config {
     pub shortcut_gallery: Option<String>,
     /// Global shortcut that starts and stops a recording. `None` means the default.
     pub shortcut_record: Option<String>,
+    /// Global shortcut that copies the text in an area (OCR). `None` means the default.
+    pub shortcut_text: Option<String>,
     /// MP4 or GIF, as picked in the last recording.
     pub record_format: Option<crate::record::Format>,
     /// How many recent captures the gallery keeps; 0 turns the history off.

@@ -225,6 +225,34 @@ body.typing #sel { cursor: text; }
   caret-color: currentColor;
 }
 
+/* Text mode: the words read by OCR can be selected and copied. */
+#ocr {
+  position: fixed;
+  background: rgba(0, 0, 0, 0.32);
+  pointer-events: none;
+}
+#ocr .word {
+  position: absolute;
+  margin: -2px 0 0 -2px;
+  padding: 2px;
+  box-sizing: content-box;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.2);
+}
+#ocr .word.selected { background: rgba(124, 92, 245, 0.55); }
+body.text-mode #sel { cursor: text; }
+body:not(.text-mode) .text-only,
+body.text-mode #toolbar .shot-only { display: none !important; }
+.bar button.copytext-btn {
+  width: auto;
+  padding: 0 12px 0 9px;
+  gap: 7px;
+  grid-auto-flow: column;
+  background: var(--accent);
+  font: 600 13px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+.bar button.copytext-btn:hover { background: var(--accent); filter: brightness(1.1); }
+
 /* Recording mode: pick the area and the format, no annotations. */
 body.record .shot-only,
 body:not(.record) .rec-only { display: none !important; }

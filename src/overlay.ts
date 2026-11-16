@@ -27,10 +27,21 @@ type Drag =
   | { kind: "resize"; handle: Handle; start: Rect };
 
 const MIN_SIZE = 4;
+const IS_MAC = navigator.userAgent.includes("Mac");
+/** How the copy modifier reads in tooltips. */
+const MOD = IS_MAC ? "⌘" : "Ctrl+";
 // Injected by the Rust side when it creates the overlay window.
 declare global {
   interface Window {
-    __KADRO__?: { monitor: number; nonce: number; full: boolean; record?: boolean; format?: Format };
+    __KADRO__?: {
+      monitor: number;
+      nonce: number;
+      full: boolean;
+      record?: boolean;
+      /** Opened by the "copy text" shortcut: the text of the area is copied right away. */
+      ocr?: boolean;
+      format?: Format;
+    };
   }
 }
 type Format = "mp4" | "gif";
@@ -39,6 +50,7 @@ const {
   nonce,
   full: startFull,
   record: recordMode = false,
+  ocr: quickText = false,
   format: startFormat = "mp4",
 } = window.__KADRO__ ?? { monitor: 0, nonce: 0, full: false };
 let format: Format = startFormat;
@@ -57,6 +69,7 @@ const sizesEl = $("sizes");
 const ink = $<HTMLCanvasElement>("ink");
 const inkCtx = ink.getContext("2d")!;
 const textEdit = $<HTMLTextAreaElement>("text-edit");
+const ocrEl = $("ocr");
 
 const TOOL_KEYS: Record<string, Tool> = {
   p: "pen",
@@ -87,6 +100,19 @@ let current: Shape | null = null;
 let textAt: Pt | null = null;
 let shiftDown = false;
 
+// Text mode (OCR): the words found in the selection, in CSS pixels and reading
+// order, and the range of them the user picked.
+type Word = { text: string; line: number; x: number; y: number; w: number; h: number };
+type OcrWord = { text: string; x: number; y: number; w: number; h: number };
+let words: Word[] | null = null;
+let wordEls: HTMLElement[] = [];
+/** Picked words, as indexes into `words` (anchor where the drag began). */
+let pick: { anchor: number; focus: number } | null = null;
+let pickDrag: { start: Pt; moved: boolean } | null = null;
+/** Bumped when the selection changes, to drop OCR results for an older one. */
+let ocrToken = 0;
+let toastTimer = 0;
+
 const vw = () => window.innerWidth;
 const vh = () => window.innerHeight;
 const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi);
@@ -111,7 +137,7 @@ function render() {
   selEl.hidden = !has;
   sizeEl.hidden = !has;
   hint.hidden = has || drag !== null;
-  toolbar.hidden = !has || drag !== null;
+  toolbar.hidden = !has || drag !== null || quickText;
   tools.hidden = toolbar.hidden || recordMode;
   if (tools.hidden) closePopovers();
   drawInk();
@@ -208,6 +234,13 @@ function onPointerDown(e: PointerEvent) {
 
   const p = { x: e.clientX, y: e.clientY };
   const handle = target.dataset.h as Handle | undefined;
+  if (words && sel && !handle && inside(sel, p)) {
+    startPick(p);
+    document.body.setPointerCapture(e.pointerId);
+    return;
+  }
+  // Moving or redrawing the selection drops the text read from the old one.
+  exitText();
   if (handle && sel) {
     drag = { kind: "resize", handle, start: { ...sel } };
   } else if (tool && sel) {
@@ -235,6 +268,10 @@ function onPointerDown(e: PointerEvent) {
 
 function onPointerMove(e: PointerEvent) {
   shiftDown = e.shiftKey;
+  if (pickDrag) {
+    movePick({ x: e.clientX, y: e.clientY });
+    return;
+  }
   if (current) {
     updateShape({ x: e.clientX, y: e.clientY });
     return;
@@ -257,6 +294,10 @@ function onPointerMove(e: PointerEvent) {
 
 function onPointerUp(e: PointerEvent) {
   if (document.body.hasPointerCapture(e.pointerId)) document.body.releasePointerCapture(e.pointerId);
+  if (pickDrag) {
+    endPick();
+    return;
+  }
   if (current) {
     finishShape();
     return;
@@ -266,6 +307,240 @@ function onPointerUp(e: PointerEvent) {
   // A plain click (no drag) on empty space clears the selection.
   if (sel && (sel.w < MIN_SIZE || sel.h < MIN_SIZE)) sel = null;
   render();
+  if (quickText && sel) void copyAreaText();
+}
+
+// ---- Text (OCR) ----
+
+/** Headers that tell the Rust side which part of the screenshot to use. */
+function requestHeaders(rect: ReturnType<typeof toImageRect>) {
+  const headers: Record<string, string> = { "x-kadro-rect": JSON.stringify(rect) };
+  const blurs = shapes.flatMap((s) =>
+    s.kind === "blur" ? [{ ...toImageRect(boxOf(s)), block: blockPx(s) }] : [],
+  );
+  if (blurs.length) headers["x-kadro-blur"] = JSON.stringify(blurs);
+  return headers;
+}
+
+/** Reads the text in the selection; null if the selection changed meanwhile. */
+async function readText(): Promise<Word[] | null> {
+  if (!sel) return null;
+  const token = ++ocrToken;
+  const rect = toImageRect(sel);
+  const sx = shot.naturalWidth / vw();
+  const sy = shot.naturalHeight / vh();
+  showToast("Reconhecendo texto…");
+  const lines = await invoke<{ words: OcrWord[] }[]>("recognize_text", new Uint8Array(), {
+    headers: requestHeaders(rect),
+  });
+  if (token !== ocrToken) return null;
+  hideToast();
+  return lines.flatMap((l, line) =>
+    l.words.map((w) => ({
+      text: w.text,
+      line,
+      x: (rect.x + w.x) / sx,
+      y: (rect.y + w.y) / sy,
+      w: w.w / sx,
+      h: w.h / sy,
+    })),
+  );
+}
+
+/** Joins words with spaces, and lines with line breaks. */
+function joinWords(list: Word[]) {
+  let out = "";
+  list.forEach((w, i) => {
+    if (i > 0) out += list[i - 1].line === w.line ? " " : "\n";
+    out += w.text;
+  });
+  return out;
+}
+
+async function enterText() {
+  if (!sel || busy || words) return;
+  setTool(null);
+  busy = true;
+  try {
+    const found = await readText();
+    if (!found) return;
+    if (found.length === 0) {
+      showToast("Nenhum texto encontrado nessa área.", 1800);
+      return;
+    }
+    words = found;
+    pick = null;
+    document.body.classList.add("text-mode");
+    tools.querySelector('[data-action="ocr"]')!.classList.add("active");
+    buildWords();
+    render();
+  } catch (err) {
+    showToast(`Erro: ${err}`, 3000);
+  } finally {
+    busy = false;
+  }
+}
+
+function exitText() {
+  ocrToken++;
+  if (!words) return;
+  words = null;
+  pick = null;
+  pickDrag = null;
+  wordEls = [];
+  ocrEl.replaceChildren();
+  ocrEl.hidden = true;
+  document.body.classList.remove("text-mode");
+  tools.querySelector('[data-action="ocr"]')!.classList.remove("active");
+}
+
+function buildWords() {
+  if (!words || !sel) return;
+  Object.assign(ocrEl.style, {
+    left: `${sel.x}px`,
+    top: `${sel.y}px`,
+    width: `${sel.w}px`,
+    height: `${sel.h}px`,
+  });
+  wordEls = words.map((w) => {
+    const el = document.createElement("div");
+    el.className = "word";
+    Object.assign(el.style, {
+      left: `${w.x - sel!.x}px`,
+      top: `${w.y - sel!.y}px`,
+      width: `${w.w}px`,
+      height: `${w.h}px`,
+    });
+    return el;
+  });
+  ocrEl.replaceChildren(...wordEls);
+  ocrEl.hidden = false;
+  updatePick();
+}
+
+/** The picked words, in reading order. */
+function pickedWords(): Word[] {
+  if (!words || !pick) return [];
+  const a = Math.min(pick.anchor, pick.focus);
+  const b = Math.max(pick.anchor, pick.focus);
+  return words.slice(a, b + 1);
+}
+
+function updatePick() {
+  const a = pick ? Math.min(pick.anchor, pick.focus) : -1;
+  const b = pick ? Math.max(pick.anchor, pick.focus) : -2;
+  wordEls.forEach((el, i) => el.classList.toggle("selected", i >= a && i <= b));
+  const btn = toolbar.querySelector<HTMLElement>('[data-action="copytext"]')!;
+  const n = pickedWords().length;
+  btn.querySelector("span")!.textContent = n ? "Copiar seleção" : "Copiar tudo";
+  const tip = `${n ? "Copiar o texto selecionado" : "Copiar todo o texto"} (Enter ou ${MOD}C)`;
+  btn.dataset.tip = tip;
+  btn.setAttribute("aria-label", tip);
+  // The label's width changed: keep the toolbar aligned with the selection.
+  if (sel && !toolbar.hidden) placeToolbar(sel);
+}
+
+/** The word under `p`, or -1. A few pixels of slack make small words easy to hit. */
+function wordAt(p: Pt, slack = 3) {
+  if (!words) return -1;
+  return words.findIndex(
+    (w) => p.x >= w.x - slack && p.x <= w.x + w.w + slack && p.y >= w.y - slack && p.y <= w.y + w.h + slack,
+  );
+}
+
+/** The word closest to `p`, preferring words on the same line height. */
+function nearestWord(p: Pt) {
+  if (!words) return -1;
+  let best = -1;
+  let bestD = Infinity;
+  words.forEach((w, i) => {
+    const dx = Math.max(w.x - p.x, 0, p.x - (w.x + w.w));
+    const dy = Math.max(w.y - p.y, 0, p.y - (w.y + w.h));
+    const d = dx + dy * 4;
+    if (d < bestD) {
+      bestD = d;
+      best = i;
+    }
+  });
+  return best;
+}
+
+function startPick(p: Pt) {
+  // A click on a word picks it; on empty space it clears the pick, unless it
+  // turns into a drag.
+  const hit = wordAt(p);
+  pickDrag = { start: p, moved: false };
+  pick = hit >= 0 ? { anchor: hit, focus: hit } : null;
+  updatePick();
+}
+
+function movePick(p: Pt) {
+  if (!pickDrag || !words) return;
+  if (!pickDrag.moved && Math.hypot(p.x - pickDrag.start.x, p.y - pickDrag.start.y) < 3) return;
+  pickDrag.moved = true;
+  const focus = nearestWord(p);
+  if (focus < 0) return;
+  if (!pick) pick = { anchor: nearestWord(pickDrag.start), focus };
+  else pick.focus = focus;
+  updatePick();
+}
+
+function endPick() {
+  pickDrag = null;
+}
+
+/** Picks the whole line under `p` (double click). */
+function pickLine(p: Pt) {
+  if (!words) return;
+  const i = wordAt(p);
+  if (i < 0) return;
+  const line = words[i].line;
+  const first = words.findIndex((w) => w.line === line);
+  let last = first;
+  while (last + 1 < words.length && words[last + 1].line === line) last++;
+  pick = { anchor: first, focus: last };
+  updatePick();
+}
+
+function pickAll() {
+  if (!words?.length) return;
+  pick = { anchor: 0, focus: words.length - 1 };
+  updatePick();
+}
+
+/** Copies the picked words, or all of them, and closes the overlay. */
+async function copyText() {
+  if (!words || busy) return;
+  const picked = pickedWords();
+  const text = joinWords(picked.length ? picked : words);
+  busy = true;
+  try {
+    await invoke("copy_text", { text, close: true });
+  } catch (err) {
+    showToast(`Erro: ${err}`, 3000);
+    busy = false;
+  }
+}
+
+/** "Copy text" shortcut: reads the area just picked and copies all of its text. */
+async function copyAreaText() {
+  if (busy) return;
+  busy = true;
+  try {
+    const found = await readText();
+    if (!found) return;
+    if (found.length === 0) {
+      sel = null;
+      render();
+      showToast("Nenhum texto encontrado. Arraste sobre outra área.", 2200);
+      return;
+    }
+    await invoke("copy_text", { text: joinWords(found), close: true });
+  } catch (err) {
+    showToast(`Erro: ${err}`, 3000);
+  } finally {
+    busy = false;
+  }
 }
 
 // ---- Annotations ----
@@ -539,14 +814,23 @@ async function inkPng(img: { x: number; y: number; width: number; height: number
 }
 
 function selectFullScreen() {
+  exitText();
   fullScreen = true;
   sel = { x: 0, y: 0, w: vw(), h: vh() };
   render();
 }
 
-function showToast(text: string) {
+/** Shows a message at the bottom; `ms` hides it after that long. */
+function showToast(text: string, ms = 0) {
+  clearTimeout(toastTimer);
   toast.textContent = text;
   toast.hidden = false;
+  if (ms) toastTimer = window.setTimeout(hideToast, ms);
+}
+
+function hideToast() {
+  clearTimeout(toastTimer);
+  toast.hidden = true;
 }
 
 async function close() {
@@ -575,8 +859,13 @@ async function startRecording() {
 async function run(action: string) {
   if (busy) return;
   if (action === "close") return close();
-  if (action === "full") return selectFullScreen();
+  if (action === "full") {
+    selectFullScreen();
+    if (quickText) void copyAreaText();
+    return;
+  }
   if (!sel) return;
+  if (action === "copytext") return copyText();
   if (recordMode) {
     if (action === "record") await startRecording();
     return;
@@ -590,12 +879,7 @@ async function run(action: string) {
     // The annotations travel as a PNG in the request body and the selection in a
     // header; the Rust side crops the screenshot and lays the annotations on top.
     const body = await inkPng(rect);
-    const headers: Record<string, string> = { "x-kadro-rect": JSON.stringify(rect) };
-    const blurs = shapes.flatMap((s) =>
-      s.kind === "blur" ? [{ ...toImageRect(boxOf(s)), block: blockPx(s) }] : [],
-    );
-    if (blurs.length) headers["x-kadro-blur"] = JSON.stringify(blurs);
-    const options = { headers };
+    const options = { headers: requestHeaders(rect) };
     if (action === "copy") {
       await invoke("copy_selection", body, options);
     } else if (action === "save") {
@@ -616,9 +900,14 @@ async function run(action: string) {
 function onToolsClick(e: MouseEvent) {
   const btn = (e.target as HTMLElement).closest("button");
   if (!btn) return;
-  if (btn.dataset.tool) {
+  if (btn.dataset.action === "ocr") {
+    closePopovers();
+    if (words) exitText();
+    else void enterText();
+  } else if (btn.dataset.tool) {
     const t = btn.dataset.tool as Tool;
     closePopovers();
+    exitText();
     setTool(tool === t ? null : t);
   } else if (btn.dataset.color) {
     setColor(btn.dataset.color);
@@ -656,6 +945,32 @@ function onKeyDown(e: KeyboardEvent) {
   shiftDown = e.shiftKey;
   const mod = e.ctrlKey || e.metaKey;
   const key = e.key.toLowerCase();
+  if (words) {
+    // Text mode keys: pick and copy words; anything else falls through.
+    if (e.key === "Escape") {
+      e.preventDefault();
+      if (pick) {
+        pick = null;
+        updatePick();
+      } else exitText();
+      return;
+    }
+    if (e.key === "Enter" || (mod && key === "c")) {
+      e.preventDefault();
+      void copyText();
+      return;
+    }
+    if (mod && key === "a") {
+      e.preventDefault();
+      pickAll();
+      return;
+    }
+    if (!mod && key === "o") {
+      e.preventDefault();
+      exitText();
+      return;
+    }
+  }
   if (e.key === "Escape") {
     e.preventDefault();
     if (current) {
@@ -688,6 +1003,11 @@ function onKeyDown(e: KeyboardEvent) {
       e.preventDefault();
       setFormat(key === "g" ? "gif" : "mp4");
     }
+  } else if (quickText) {
+    if (key === "f" || (mod && key === "a")) {
+      e.preventDefault();
+      void run("full");
+    }
   } else if (e.key === "Enter" || (mod && key === "c")) {
     e.preventDefault();
     void run("copy");
@@ -697,9 +1017,13 @@ function onKeyDown(e: KeyboardEvent) {
   } else if (key === "f" || (mod && key === "a")) {
     e.preventDefault();
     selectFullScreen();
+  } else if (!mod && !e.altKey && key === "o" && sel) {
+    e.preventDefault();
+    void enterText();
   } else if (!mod && !e.altKey && TOOL_KEYS[key] && sel) {
     e.preventDefault();
     const t = TOOL_KEYS[key];
+    exitText();
     setTool(tool === t ? null : t);
   }
 }
@@ -710,12 +1034,16 @@ async function init() {
     hint.innerHTML =
       "Arraste para escolher o que gravar · <kbd>F</kbd> tela inteira · <kbd>Esc</kbd> cancelar";
     setFormat(format);
+  } else if (quickText) {
+    document.body.classList.add("quick-text");
+    hint.innerHTML =
+      "Arraste sobre o texto que quer copiar · <kbd>F</kbd> tela inteira · <kbd>Esc</kbd> cancelar";
   }
   buildPopovers();
   setColor(color);
   setSize(sizeIdx);
   updateHistoryButtons();
-  if (navigator.userAgent.includes("Mac")) {
+  if (IS_MAC) {
     document.querySelectorAll<HTMLElement>("[data-tip]").forEach((b) => {
       b.dataset.tip = b.dataset.tip!.replace(/Ctrl\+/g, "⌘");
       b.setAttribute("aria-label", b.dataset.tip);
@@ -730,8 +1058,9 @@ async function init() {
     e.preventDefault();
     void close();
   });
-  selEl.addEventListener("dblclick", () => {
-    if (!tool) void run(recordMode ? "record" : "copy");
+  selEl.addEventListener("dblclick", (e) => {
+    if (words) pickLine({ x: e.clientX, y: e.clientY });
+    else if (!tool && !quickText) void run(recordMode ? "record" : "copy");
   });
   // Buttons must not take focus away from the text box.
   for (const bar of [toolbar, tools]) bar.addEventListener("mousedown", (e) => e.preventDefault());
