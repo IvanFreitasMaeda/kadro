@@ -20,6 +20,7 @@ pub struct TrayItems {
     full: MenuItem<Wry>,
     gallery: MenuItem<Wry>,
     record: MenuItem<Wry>,
+    text: MenuItem<Wry>,
     update: MenuItem<Wry>,
 }
 
@@ -50,6 +51,13 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         true,
         Some(shortcuts::current(app, Kind::Record)),
     )?;
+    let text = MenuItem::with_id(
+        app,
+        "text",
+        "Copiar texto da tela",
+        true,
+        Some(shortcuts::current(app, Kind::Text)),
+    )?;
     let gallery = MenuItem::with_id(
         app,
         "gallery",
@@ -70,6 +78,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         &[
             &area,
             &full,
+            &text,
             &record,
             &PredefinedMenuItem::separator(app)?,
             &gallery,
@@ -94,6 +103,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         full,
         gallery,
         record,
+        text,
         update,
     });
 
@@ -116,6 +126,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         .on_menu_event(|app, event| match event.id().as_ref() {
             "area" => capture::start(app, false),
             "full" => capture::start(app, true),
+            "text" => capture::start_text(app),
             "record" => record::toggle(app),
             "gallery" => gallery::toggle(app),
             "open_dir" => open_save_dir(app),
@@ -171,6 +182,9 @@ pub fn refresh_accelerators(app: &AppHandle) {
     let _ = items
         .record
         .set_accelerator(Some(shortcuts::current(app, Kind::Record)));
+    let _ = items
+        .text
+        .set_accelerator(Some(shortcuts::current(app, Kind::Text)));
 }
 
 /// Switches the menu and tooltip between "record" and "stop".

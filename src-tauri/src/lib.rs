@@ -4,6 +4,7 @@ mod config;
 mod fileclip;
 mod gallery;
 mod history;
+mod ocr;
 #[cfg(target_os = "macos")]
 mod permissions;
 mod record;
@@ -35,6 +36,8 @@ pub fn run() {
             capture::save_selection,
             capture::save_selection_as,
             capture::close_capture,
+            capture::recognize_text,
+            capture::copy_text,
             gallery::close_gallery,
             history::history_list,
             history::history_copy,

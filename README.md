@@ -27,6 +27,7 @@ Macs com processador Intel não são suportados. Depois de baixar, veja [Instala
 - Ajuste a seleção depois: arraste para mover, use as alças para redimensionar.
 - Anote antes de copiar: lápis, marca-texto, desfoque (pixeliza dados sensíveis), linha, seta, retângulo, elipse e texto, com cores, três espessuras e desfazer/refazer.
 - Copie para a área de transferência ou salve em PNG numa pasta.
+- **Copie o texto** que aparece na captura: o Kadro reconhece o texto (OCR) e você seleciona só o trecho que quer, ou copia tudo. Também tem um atalho que copia direto o texto de uma área. Usa o OCR do próprio sistema (Vision no macOS, Windows.Media.Ocr no Windows), então funciona offline e não aumenta o app. Lê português e inglês.
 - Histórico na lateral: as últimas capturas aparecem em miniatura, e um clique copia de novo. Dá para salvar, abrir ou remover cada uma dali.
 - Grave a tela inteira ou uma área em **MP4** ou **GIF**. Uma barrinha mostra o tempo e o botão de parar, e fica de fora do vídeo. A gravação vai para a pasta de capturas e aparece no histórico.
 - Atalhos, pasta de capturas e tamanho do histórico configuráveis em Preferências.
@@ -41,6 +42,7 @@ Macs com processador Intel não são suportados. Depois de baixar, veja [Instala
 | Capturar tela inteira | `⌘ ⇧ 1` | `Ctrl Shift 1` |
 | Abrir/fechar o histórico | `⌘ ⇧ 0` | `Ctrl Shift 0` |
 | Gravar a tela / parar a gravação | `⌘ ⇧ 9` | `Ctrl Shift 9` |
+| Copiar o texto de uma área (OCR) | `⌘ ⇧ 8` | `Ctrl Shift 8` |
 
 Dá para trocar os atalhos em **Preferências…**, no menu do ícone: clique no atalho e pressione a nova combinação.
 
@@ -58,6 +60,8 @@ Dentro da captura:
 | `Ctrl/⌘ Z` · `Ctrl/⌘ Shift Z` | Desfazer · refazer |
 
 No texto, `Enter` confirma e `Shift Enter` quebra a linha.
+
+Para copiar texto da captura, aperte `O` (ou o botão de texto na barra de ferramentas). As palavras reconhecidas ficam destacadas: clique numa palavra ou arraste para selecionar um trecho, dê duplo clique para pegar a linha inteira e `Ctrl/⌘ A` para pegar tudo. `Enter` ou `Ctrl/⌘ C` copia a seleção (ou todo o texto, se nada estiver selecionado). `Esc` desfaz a seleção e, de novo, volta para a captura. No Windows, o OCR usa os idiomas instalados no sistema (Configurações > Hora e idioma > Idioma).
 
 Na gravação:
 
@@ -147,6 +151,7 @@ A assinatura das atualizações usa uma chave privada guardada nos secrets do re
 Estrutura:
 
 - `src-tauri/src/capture.rs`: captura dos monitores, janelas de seleção, recorte, copiar e salvar.
+- `src-tauri/src/ocr.rs`: reconhecimento de texto com o OCR do sistema (Vision no macOS, Windows.Media.Ocr no Windows).
 - `src-tauri/src/tray.rs`: ícone e menu da bandeja.
 - `src-tauri/src/updater.rs`: procura, baixa e instala atualizações (GitHub Releases, `latest.json`).
 - `src-tauri/src/shortcuts.rs`: atalhos globais configuráveis.

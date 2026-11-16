@@ -35,7 +35,7 @@ pub fn open(app: &AppHandle) {
     }
     let result = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("settings.html".into()))
         .title("Preferências do Kadro")
-        .inner_size(480.0, 536.0)
+        .inner_size(480.0, 580.0)
         .resizable(false)
         .maximizable(false)
         .minimizable(false)
@@ -56,6 +56,7 @@ pub struct Settings {
     shortcut_full: String,
     shortcut_gallery: String,
     shortcut_record: String,
+    shortcut_text: String,
     history_limit: usize,
     save_dir: String,
     autostart: bool,
@@ -70,6 +71,7 @@ pub fn get_settings(app: AppHandle) -> Settings {
         shortcut_full: shortcuts::current(&app, shortcuts::Kind::Full),
         shortcut_gallery: shortcuts::current(&app, shortcuts::Kind::Gallery),
         shortcut_record: shortcuts::current(&app, shortcuts::Kind::Record),
+        shortcut_text: shortcuts::current(&app, shortcuts::Kind::Text),
         history_limit: history::limit(&app),
         save_dir: save_dir.display().to_string(),
         autostart: autostart::enabled(&app),

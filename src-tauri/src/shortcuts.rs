@@ -14,6 +14,8 @@ pub const DEFAULT_FULL: &str = "CommandOrControl+Shift+1";
 pub const DEFAULT_GALLERY: &str = "CommandOrControl+Shift+0";
 /// Start a recording, or stop the one running.
 pub const DEFAULT_RECORD: &str = "CommandOrControl+Shift+9";
+/// Copy the text in an area (OCR).
+pub const DEFAULT_TEXT: &str = "CommandOrControl+Shift+8";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -22,9 +24,16 @@ pub enum Kind {
     Full,
     Gallery,
     Record,
+    Text,
 }
 
-pub const ALL: [Kind; 4] = [Kind::Area, Kind::Full, Kind::Gallery, Kind::Record];
+pub const ALL: [Kind; 5] = [
+    Kind::Area,
+    Kind::Full,
+    Kind::Gallery,
+    Kind::Record,
+    Kind::Text,
+];
 
 /// The accelerator currently configured for `kind`.
 pub fn current(app: &AppHandle, kind: Kind) -> String {
@@ -35,6 +44,7 @@ pub fn current(app: &AppHandle, kind: Kind) -> String {
         Kind::Full => config.shortcut_full.clone(),
         Kind::Gallery => config.shortcut_gallery.clone(),
         Kind::Record => config.shortcut_record.clone(),
+        Kind::Text => config.shortcut_text.clone(),
     }
     .unwrap_or_else(|| default(kind).to_string())
 }
@@ -45,6 +55,7 @@ fn default(kind: Kind) -> &'static str {
         Kind::Full => DEFAULT_FULL,
         Kind::Gallery => DEFAULT_GALLERY,
         Kind::Record => DEFAULT_RECORD,
+        Kind::Text => DEFAULT_TEXT,
     }
 }
 
@@ -68,6 +79,7 @@ pub fn plugin() -> tauri::plugin::TauriPlugin<Wry> {
                 Some(Kind::Gallery) => gallery::toggle(app),
                 Some(Kind::Record) => record::toggle(app),
                 Some(Kind::Full) => capture::start(app, true),
+                Some(Kind::Text) => capture::start_text(app),
                 _ => capture::start(app, false),
             }
         })
@@ -123,6 +135,7 @@ pub fn set(app: &AppHandle, kind: Kind, accelerator: Option<String>) -> Result<S
             Kind::Full => config.shortcut_full = value,
             Kind::Gallery => config.shortcut_gallery = value,
             Kind::Record => config.shortcut_record = value,
+            Kind::Text => config.shortcut_text = value,
         }
         config::store(app, &config)?;
     }
