@@ -37,6 +37,8 @@ declare global {
       monitor: number;
       nonce: number;
       full: boolean;
+      /** This overlay is on the monitor under the cursor, so it takes the focus. */
+      focus?: boolean;
       record?: boolean;
       /** Opened by the "copy text" shortcut: the text of the area is copied right away. */
       ocr?: boolean;
@@ -49,6 +51,7 @@ const {
   monitor,
   nonce,
   full: startFull,
+  focus: startFocused = true,
   record: recordMode = false,
   ocr: quickText = false,
   format: startFormat = "mp4",
@@ -1089,7 +1092,11 @@ async function init() {
   render();
   const win = getCurrentWindow();
   await win.show();
-  await win.setFocus();
+  if (startFocused) await win.setFocus();
+  // With several monitors, the keyboard (Esc, Enter, tool keys) follows the mouse.
+  document.addEventListener("pointermove", () => {
+    if (!document.hasFocus()) void win.setFocus();
+  });
 }
 
 init().catch((err) => {
