@@ -16,6 +16,11 @@ extern "C" {
     fn CGRequestScreenCaptureAccess() -> bool;
 }
 
+#[link(name = "ApplicationServices", kind = "framework")]
+extern "C" {
+    fn AXIsProcessTrusted() -> bool;
+}
+
 const SETTINGS_URL: &str =
     "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture";
 
@@ -68,17 +73,25 @@ pub fn reset_after_update(app: &AppHandle) {
         return;
     }
     if !unsafe { CGPreflightScreenCaptureAccess() } {
-        match std::process::Command::new("/usr/bin/tccutil")
-            .args(["reset", "ScreenCapture", &app.config().identifier])
-            .status()
-        {
-            Ok(status) if status.success() => {}
-            Ok(status) => log::warn!("tccutil reset exited with {status}"),
-            Err(err) => log::warn!("tccutil reset failed: {err}"),
-        }
+        tcc_reset(app, "ScreenCapture");
+    }
+    // Same for Accessibility, used to paste from the clipboard history.
+    if !unsafe { AXIsProcessTrusted() } {
+        tcc_reset(app, "Accessibility");
     }
     cfg.last_version = Some(current);
     if let Err(err) = config::store(app, &cfg) {
         log::warn!("could not save config: {err}");
+    }
+}
+
+fn tcc_reset(app: &AppHandle, service: &str) {
+    match std::process::Command::new("/usr/bin/tccutil")
+        .args(["reset", service, &app.config().identifier])
+        .status()
+    {
+        Ok(status) if status.success() => {}
+        Ok(status) => log::warn!("tccutil reset {service} exited with {status}"),
+        Err(err) => log::warn!("tccutil reset {service} failed: {err}"),
     }
 }

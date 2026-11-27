@@ -30,7 +30,8 @@ Macs com processador Intel não são suportados. Depois de baixar, veja [Instala
 - **Copie o texto** que aparece na captura: o Kadro reconhece o texto (OCR) e você seleciona só o trecho que quer, ou copia tudo. Também tem um atalho que copia direto o texto de uma área. Usa o OCR do próprio sistema (Vision no macOS, Windows.Media.Ocr no Windows), então funciona offline e não aumenta o app. Lê português e inglês.
 - Histórico na lateral: as últimas capturas aparecem em miniatura, e um clique copia de novo. Dá para salvar, abrir ou remover cada uma dali.
 - Grave a tela inteira ou uma área em **MP4** ou **GIF**. Uma barrinha mostra o tempo e o botão de parar, e fica de fora do vídeo. A gravação vai para a pasta de capturas e aparece no histórico.
-- Atalhos, pasta de capturas e tamanho do histórico configuráveis em Preferências.
+- **Histórico da área de transferência**, como o Win+V do Windows: um atalho abre uma janelinha perto do mouse com tudo que você copiou (textos, links, imagens e arquivos), do mais novo para o mais antigo. Busque digitando, fixe os que usa sempre e escolha um para colar direto no app em que você estava. Fica separado do histórico de capturas, com pasta e limites próprios (padrão: últimos 100 itens por 30 dias). Ignora o que gerenciadores de senha marcam como sigiloso.
+- Atalhos, pasta de capturas e tamanho dos históricos configuráveis em Preferências.
 - Funciona com vários monitores.
 - Se atualiza sozinho: avisa quando sai versão nova e instala com um clique.
 
@@ -43,6 +44,7 @@ Macs com processador Intel não são suportados. Depois de baixar, veja [Instala
 | Abrir/fechar o histórico | `⌘ ⇧ 0` | `Ctrl Shift 0` |
 | Gravar a tela / parar a gravação | `⌘ ⇧ 9` | `Ctrl Shift 9` |
 | Copiar o texto de uma área (OCR) | `⌘ ⇧ 8` | `Ctrl Shift 8` |
+| Histórico da área de transferência | `⌘ ⇧ V` | `Ctrl Shift V` |
 
 Dá para trocar os atalhos em **Preferências…**, no menu do ícone: clique no atalho e pressione a nova combinação.
 
@@ -62,6 +64,8 @@ Dentro da captura:
 No texto, `Enter` confirma e `Shift Enter` quebra a linha.
 
 Para copiar texto da captura, aperte `O` (ou o botão de texto na barra de ferramentas). As palavras reconhecidas ficam destacadas: clique numa palavra ou arraste para selecionar um trecho, dê duplo clique para pegar a linha inteira e `Ctrl/⌘ A` para pegar tudo. `Enter` ou `Ctrl/⌘ C` copia a seleção (ou todo o texto, se nada estiver selecionado). `Esc` desfaz a seleção e, de novo, volta para a captura. No Windows, o OCR usa os idiomas instalados no sistema (Configurações > Hora e idioma > Idioma).
+
+No histórico da área de transferência, digite para buscar e use `↑` `↓` para escolher. `Enter` (ou um clique) cola no app em que você estava, `Shift Enter` só copia, `Ctrl/⌘ 1`–`9` cola um dos nove primeiros, `Ctrl/⌘ P` fixa ou desafixa e `Ctrl/⌘ Delete` remove. `Esc` fecha. No Mac, para colar direto o Kadro precisa da permissão de **Acessibilidade** (Ajustes do Sistema → Privacidade e Segurança); sem ela, escolher um item só copia. Dá para desligar o colar direto em Preferências.
 
 Na gravação:
 
@@ -124,6 +128,7 @@ rm -rf /Applications/Kadro.app \
   ~/Library/Caches/io.github.ivanfreitasmaeda.kadro \
   ~/Library/WebKit/io.github.ivanfreitasmaeda.kadro
 tccutil reset ScreenCapture io.github.ivanfreitasmaeda.kadro
+tccutil reset Accessibility io.github.ivanfreitasmaeda.kadro
 ```
 
 Depois é só seguir o [Instalar no macOS](#instalar-no-macos) com o `.dmg` novo.
@@ -159,11 +164,13 @@ Estrutura:
 - `src-tauri/src/record/`: gravação de tela. `macos.rs` usa ScreenCaptureKit + AVAssetWriter, `windows.rs` usa Windows Graphics Capture + Media Foundation (os dois codificam H.264 com o codificador do próprio sistema), `gif.rs` monta o GIF.
 - `src-tauri/src/fileclip.rs`: copia um arquivo (a gravação) para a área de transferência.
 - `src-tauri/src/gallery.rs`: janela lateral do histórico.
+- `src-tauri/src/clipboard/`: histórico da área de transferência. `mod.rs` vigia o contador de mudanças do sistema (sem abrir a área de transferência), guarda os itens e aplica os limites; `popup.rs` abre a janelinha; `macos.rs` e `windows.rs` cuidam do que é de cada sistema (itens sigilosos, voltar ao app anterior e colar).
 - `src-tauri/src/settings.rs`: janela de preferências.
 - `src-tauri/src/config.rs`: configurações salvas (atalhos, pasta de capturas e tamanho do histórico).
 - `src/overlay.ts`: interface de seleção e anotação.
 - `src/annotate.ts`: formas das anotações e como desenhá-las.
 - `src/gallery.ts`: interface do histórico.
+- `src/clipboard.ts`: interface do histórico da área de transferência.
 - `src/record.ts`: barrinha de controle da gravação.
 - `src/settings.ts`: interface das preferências.
 

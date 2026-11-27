@@ -265,6 +265,20 @@ pub fn serve_shot<R: Runtime>(
         .decode_utf8_lossy()
         .into_owned();
     std::thread::spawn(move || {
+        // Clipboard history thumbnails: `c/<id>.jpg`.
+        if let Some(name) = path.trim_start_matches('/').strip_prefix("c/") {
+            let response = match crate::clipboard::serve(&app, name) {
+                Some((bytes, mime)) => http::Response::builder()
+                    .header(http::header::CONTENT_TYPE, mime)
+                    .header(http::header::CACHE_CONTROL, "max-age=31536000, immutable")
+                    .body(bytes),
+                None => http::Response::builder()
+                    .status(http::StatusCode::NOT_FOUND)
+                    .body(Vec::new()),
+            };
+            responder.respond(response.unwrap());
+            return;
+        }
         // Gallery images: `h/<id>.jpg` or `h/<id>.png`.
         if let Some(name) = path.trim_start_matches('/').strip_prefix("h/") {
             let response = match history::serve(&app, name) {

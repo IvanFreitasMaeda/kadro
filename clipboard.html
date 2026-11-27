@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Área de transferência</title>
+    <link rel="stylesheet" href="/src/clipboard.css" />
+  </head>
+  <body>
+    <header>
+      <label class="search">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6" /><path d="M20 20l-4.5-4.5" /></svg>
+        <input id="search" type="text" placeholder="Buscar no histórico" autocomplete="off" spellcheck="false" />
+      </label>
+      <button id="clear" class="icon" data-tip="Apagar o histórico (os fixados ficam)" aria-label="Apagar o histórico">
+        <svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" /></svg>
+      </button>
+    </header>
+    <main id="list"></main>
+    <div id="empty" hidden>
+      <svg viewBox="0 0 24 24"><rect x="6" y="4" width="12" height="17" rx="2" /><path d="M9 4V3h6v1M9 10h6M9 14h4" /></svg>
+      <p id="empty-title">Nada copiado ainda.</p>
+      <p id="empty-text" class="muted">Copie um texto, link ou imagem e ele aparece aqui.</p>
+    </div>
+    <footer id="status"></footer>
+    <template id="row">
+      <article class="item">
+        <div class="body"></div>
+        <div class="meta"><span class="kind"></span><span class="time"></span><span class="num"></span></div>
+        <div class="ops">
+          <button data-op="pin" class="icon" aria-label="Fixar">
+            <svg viewBox="0 0 24 24"><path d="M9 4h6l-1 6 3 3v2H7v-2l3-3zM12 15v5" /></svg>
+          </button>
+          <button data-op="delete" class="icon danger" aria-label="Remover">
+            <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        </div>
+      </article>
+    </template>
+    <div id="tip" role="tooltip" hidden></div>
+    <script type="module" src="/src/clipboard.ts"></script>
+  </body>
+</html>
