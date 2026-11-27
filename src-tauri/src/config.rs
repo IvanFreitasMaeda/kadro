@@ -28,8 +28,6 @@ pub struct Config {
     /// Clipboard items older than this many days are dropped; 0 keeps them.
     /// `None` means the default.
     pub clip_days: Option<u32>,
-    /// Whether picking a clipboard item pastes it in the app in front. `None` means yes.
-    pub clip_autopaste: Option<bool>,
     /// MP4 or GIF, as picked in the last recording.
     pub record_format: Option<crate::record::Format>,
     /// How many recent captures the gallery keeps; 0 turns the history off.

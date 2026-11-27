@@ -1,5 +1,5 @@
-// Clipboard history popup (like Windows' Win+V). Type to search, Enter pastes the
-// selected item into the app you were in, ⇧Enter only copies it.
+// Clipboard history popup (like Windows' Win+V). Type to search; Enter copies the
+// selected item and goes back to the app you were in, ready to paste.
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -17,8 +17,6 @@ type Entry = {
 };
 type Settings = {
   clip_limit: number;
-  clip_autopaste: boolean;
-  clip_paste_allowed: boolean;
   platform: string;
 };
 
@@ -35,7 +33,6 @@ let isMac = navigator.userAgent.includes("Mac");
 let entries: Entry[] = [];
 let shown: Entry[] = [];
 let selected = 0;
-let pastes = true;
 let defaultStatus = "";
 let statusTimer = 0;
 let emptyTitle = "Nada copiado ainda.";
@@ -175,12 +172,12 @@ async function load() {
   render();
 }
 
-async function use(index: number, paste: boolean) {
+async function use(index: number) {
   const entry = shown[index];
   if (!entry) return;
   try {
     // The window closes itself; nothing to do afterwards.
-    await invoke<boolean>("clip_use", { id: entry.id, paste });
+    await invoke("clip_use", { id: entry.id });
   } catch (err) {
     showStatus(String(err), "error");
     void load();
@@ -281,10 +278,10 @@ function onKeyDown(e: KeyboardEvent) {
     select(Math.min(Math.max(selected + step, 0), shown.length - 1));
   } else if (e.key === "Enter") {
     e.preventDefault();
-    void use(selected, !e.shiftKey);
+    void use(selected);
   } else if (cmd && /^[1-9]$/.test(e.key)) {
     e.preventDefault();
-    void use(Number(e.key) - 1, true);
+    void use(Number(e.key) - 1);
   } else if (cmd && key === "p") {
     e.preventDefault();
     void togglePin(selected);
@@ -297,15 +294,9 @@ function onKeyDown(e: KeyboardEvent) {
 async function init() {
   const settings = await invoke<Settings>("get_settings");
   isMac = settings.platform === "macos";
-  pastes = settings.clip_autopaste;
   const k = (s: string) => `<kbd>${s}</kbd>`;
-  if (!pastes) {
-    defaultStatus = `${k("Enter")} copia · ${k(mod() + "P")} fixa · ${k("Esc")} fecha`;
-  } else if (!settings.clip_paste_allowed) {
-    defaultStatus = "Para colar direto, permita o Kadro em Acessibilidade";
-  } else {
-    defaultStatus = `${k("Enter")} cola · ${k("⇧Enter")} só copia · ${k(mod() + "P")} fixa`;
-  }
+  const paste = isMac ? "⌘V" : "Ctrl+V";
+  defaultStatus = `${k("Enter")} copia, aí é só ${k(paste)} · ${k(mod() + "P")} fixa`;
   if (settings.clip_limit === 0) {
     emptyTitle = "O histórico está desativado.";
     emptyText = "Ative em Preferências → Área de transferência.";
@@ -320,7 +311,7 @@ async function init() {
     const op = target.closest<HTMLElement>("[data-op]")?.dataset.op;
     if (op === "pin") void togglePin(index);
     else if (op === "delete") void remove(index);
-    else void use(index, true);
+    else void use(index);
   });
   list.addEventListener("mousemove", (e) => {
     const row = (e.target as HTMLElement).closest<HTMLElement>(".item");

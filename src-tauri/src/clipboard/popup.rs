@@ -17,7 +17,7 @@ pub fn toggle(app: &AppHandle) {
         platform::activate_previous();
         return;
     }
-    // Remember where the user was, to paste there later.
+    // Remember where the user was, to go back there after picking an item.
     platform::remember_foreground();
     let app = app.clone();
     // Build windows off the main thread, like the gallery and the overlays.

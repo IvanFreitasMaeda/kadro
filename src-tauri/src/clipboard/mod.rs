@@ -25,10 +25,6 @@ mod platform {
     }
     pub fn remember_foreground() {}
     pub fn activate_previous() {}
-    pub fn send_paste() {}
-    pub fn can_paste(_prompt: bool) -> bool {
-        false
-    }
 }
 
 pub use popup::toggle;
@@ -39,7 +35,7 @@ use std::{
     io::Cursor,
     path::{Path, PathBuf},
     sync::{
-        atomic::{AtomicBool, AtomicI64, Ordering},
+        atomic::{AtomicI64, Ordering},
         Mutex,
     },
     time::{Duration, Instant},
@@ -118,8 +114,6 @@ pub struct ClipState {
 static WRITING: Mutex<()> = Mutex::new(());
 /// Change counter right after Kadro's own last write.
 static OWN_COUNT: AtomicI64 = AtomicI64::new(i64::MIN);
-/// The Accessibility prompt is shown at most once per launch.
-static PROMPTED: AtomicBool = AtomicBool::new(false);
 
 fn dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
     app.path()
@@ -143,18 +137,6 @@ pub fn days(app: &AppHandle) -> u32 {
     let state = app.state::<config::ConfigState>();
     let config = state.0.lock().unwrap();
     config.clip_days.unwrap_or(DEFAULT_DAYS)
-}
-
-pub fn autopaste(app: &AppHandle) -> bool {
-    let state = app.state::<config::ConfigState>();
-    let config = state.0.lock().unwrap();
-    config.clip_autopaste.unwrap_or(true)
-}
-
-/// Whether Kadro may type the paste shortcut into another app (on macOS this needs
-/// the Accessibility permission).
-pub fn paste_allowed() -> bool {
-    platform::can_paste(false)
 }
 
 fn now_ms() -> i64 {
@@ -536,37 +518,22 @@ fn write_clipboard(app: &AppHandle, entry: &Entry) -> Result<(), String> {
     Ok(())
 }
 
-/// Puts an item back on the clipboard, closes the popup and, when `paste` is set and
-/// allowed, pastes it into the app that was in front. Returns whether it pasted.
+/// Puts an item back on the clipboard, closes the popup and gives the focus back to
+/// the app that was in front, ready for the user to paste.
 #[tauri::command]
-pub async fn clip_use(app: AppHandle, id: String, paste: bool) -> Result<bool, String> {
+pub async fn clip_use(app: AppHandle, id: String) -> Result<(), String> {
     let entry = find(&app, &id)?;
     write_clipboard(&app, &entry)?;
     let state = app.state::<ClipState>();
     bump(&app, &state, &entry.hash);
 
-    let mut pasting = paste && autopaste(&app);
-    if pasting && !platform::can_paste(false) {
-        pasting = false;
-        // macOS: ask for Accessibility once; this time it only copies.
-        if !PROMPTED.swap(true, Ordering::SeqCst) {
-            platform::can_paste(true);
-        }
-    }
     popup::close(&app);
     let handle = app.clone();
     let _ = app.run_on_main_thread(move || {
         platform::activate_previous();
-        if pasting {
-            // Give the other app a moment to take the focus back.
-            std::thread::spawn(|| {
-                std::thread::sleep(Duration::from_millis(120));
-                platform::send_paste();
-            });
-        }
         changed(&handle);
     });
-    Ok(pasting)
+    Ok(())
 }
 
 #[tauri::command]
@@ -644,17 +611,4 @@ pub fn set_clip_retention(app: AppHandle, limit: usize, days: u32) -> Result<(),
     drop(entries);
     changed(&app);
     Ok(())
-}
-
-/// Turns pasting into the previous app on or off. On macOS, turning it on asks for
-/// the Accessibility permission. Returns whether pasting is allowed now.
-#[tauri::command]
-pub fn set_clip_autopaste(app: AppHandle, enabled: bool) -> Result<bool, String> {
-    {
-        let state = app.state::<config::ConfigState>();
-        let mut config = state.0.lock().unwrap();
-        config.clip_autopaste = (!enabled).then_some(false);
-        config::store(&app, &config)?;
-    }
-    Ok(enabled && platform::can_paste(true))
 }

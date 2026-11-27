@@ -30,7 +30,7 @@ Macs com processador Intel não são suportados. Depois de baixar, veja [Instala
 - **Copie o texto** que aparece na captura: o Kadro reconhece o texto (OCR) e você seleciona só o trecho que quer, ou copia tudo. Também tem um atalho que copia direto o texto de uma área. Usa o OCR do próprio sistema (Vision no macOS, Windows.Media.Ocr no Windows), então funciona offline e não aumenta o app. Lê português e inglês.
 - Histórico na lateral: as últimas capturas aparecem em miniatura, e um clique copia de novo. Dá para salvar, abrir ou remover cada uma dali.
 - Grave a tela inteira ou uma área em **MP4** ou **GIF**. Uma barrinha mostra o tempo e o botão de parar, e fica de fora do vídeo. A gravação vai para a pasta de capturas e aparece no histórico.
-- **Histórico da área de transferência**, como o Win+V do Windows: um atalho abre uma janelinha perto do mouse com tudo que você copiou (textos, links, imagens e arquivos), do mais novo para o mais antigo. Busque digitando, fixe os que usa sempre e escolha um para colar direto no app em que você estava. Fica separado do histórico de capturas, com pasta e limites próprios (padrão: últimos 100 itens por 30 dias). Ignora o que gerenciadores de senha marcam como sigiloso.
+- **Histórico da área de transferência**, como o Win+V do Windows: um atalho abre uma janelinha perto do mouse com tudo que você copiou (textos, links, imagens e arquivos), do mais novo para o mais antigo. Busque digitando, fixe os que usa sempre e escolha um para copiar de novo. Fica separado do histórico de capturas, com pasta e limites próprios (padrão: últimos 100 itens por 30 dias). Ignora o que gerenciadores de senha marcam como sigiloso.
 - Atalhos, pasta de capturas e tamanho dos históricos configuráveis em Preferências.
 - Funciona com vários monitores.
 - Se atualiza sozinho: avisa quando sai versão nova e instala com um clique.
@@ -65,7 +65,7 @@ No texto, `Enter` confirma e `Shift Enter` quebra a linha.
 
 Para copiar texto da captura, aperte `O` (ou o botão de texto na barra de ferramentas). As palavras reconhecidas ficam destacadas: clique numa palavra ou arraste para selecionar um trecho, dê duplo clique para pegar a linha inteira e `Ctrl/⌘ A` para pegar tudo. `Enter` ou `Ctrl/⌘ C` copia a seleção (ou todo o texto, se nada estiver selecionado). `Esc` desfaz a seleção e, de novo, volta para a captura. No Windows, o OCR usa os idiomas instalados no sistema (Configurações > Hora e idioma > Idioma).
 
-No histórico da área de transferência, digite para buscar e use `↑` `↓` para escolher. `Enter` (ou um clique) cola no app em que você estava, `Shift Enter` só copia, `Ctrl/⌘ 1`–`9` cola um dos nove primeiros, `Ctrl/⌘ P` fixa ou desafixa e `Ctrl/⌘ Delete` remove. `Esc` fecha. No Mac, para colar direto o Kadro precisa da permissão de **Acessibilidade** (Ajustes do Sistema → Privacidade e Segurança); sem ela, escolher um item só copia. Dá para desligar o colar direto em Preferências.
+No histórico da área de transferência, digite para buscar e use `↑` `↓` para escolher. `Enter` (ou um clique) copia o item e volta para o app em que você estava, pronto para colar com `Ctrl/⌘ V`. `Ctrl/⌘ 1`–`9` copia um dos nove primeiros, `Ctrl/⌘ P` fixa ou desafixa e `Ctrl/⌘ Delete` remove. `Esc` fecha.
 
 Na gravação:
 
@@ -128,7 +128,6 @@ rm -rf /Applications/Kadro.app \
   ~/Library/Caches/io.github.ivanfreitasmaeda.kadro \
   ~/Library/WebKit/io.github.ivanfreitasmaeda.kadro
 tccutil reset ScreenCapture io.github.ivanfreitasmaeda.kadro
-tccutil reset Accessibility io.github.ivanfreitasmaeda.kadro
 ```
 
 Depois é só seguir o [Instalar no macOS](#instalar-no-macos) com o `.dmg` novo.

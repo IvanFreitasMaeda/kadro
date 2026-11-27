@@ -61,9 +61,6 @@ pub struct Settings {
     history_limit: usize,
     clip_limit: usize,
     clip_days: u32,
-    clip_autopaste: bool,
-    /// macOS: Kadro has the Accessibility permission it needs to paste.
-    clip_paste_allowed: bool,
     save_dir: String,
     autostart: bool,
     platform: &'static str,
@@ -82,8 +79,6 @@ pub fn get_settings(app: AppHandle) -> Settings {
         history_limit: history::limit(&app),
         clip_limit: clipboard::limit(&app),
         clip_days: clipboard::days(&app),
-        clip_autopaste: clipboard::autopaste(&app),
-        clip_paste_allowed: clipboard::paste_allowed(),
         save_dir: save_dir.display().to_string(),
         autostart: autostart::enabled(&app),
         platform: std::env::consts::OS,

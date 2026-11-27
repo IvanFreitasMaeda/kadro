@@ -1,5 +1,5 @@
-//! Windows side of the clipboard history: the clipboard sequence number, the window
-//! that was in front, and pasting with a synthetic Ctrl+V.
+//! Windows side of the clipboard history: the clipboard sequence number, items to
+//! skip, and the window that was in front.
 
 use std::sync::atomic::{AtomicIsize, Ordering};
 
@@ -14,13 +14,7 @@ use windows::{
             },
             Memory::{GlobalLock, GlobalUnlock},
         },
-        UI::{
-            Input::KeyboardAndMouse::{
-                SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS,
-                KEYEVENTF_KEYUP, VIRTUAL_KEY, VK_CONTROL,
-            },
-            WindowsAndMessaging::{GetForegroundWindow, IsWindow, SetForegroundWindow},
-        },
+        UI::WindowsAndMessaging::{GetForegroundWindow, IsWindow, SetForegroundWindow},
     },
 };
 
@@ -81,42 +75,4 @@ pub fn activate_previous() {
             let _ = SetForegroundWindow(hwnd);
         }
     }
-}
-
-fn key(vk: VIRTUAL_KEY, up: bool) -> INPUT {
-    INPUT {
-        r#type: INPUT_KEYBOARD,
-        Anonymous: INPUT_0 {
-            ki: KEYBDINPUT {
-                wVk: vk,
-                wScan: 0,
-                dwFlags: if up {
-                    KEYEVENTF_KEYUP
-                } else {
-                    KEYBD_EVENT_FLAGS(0)
-                },
-                time: 0,
-                dwExtraInfo: 0,
-            },
-        },
-    }
-}
-
-/// Types Ctrl+V into the window in front.
-pub fn send_paste() {
-    let v = VIRTUAL_KEY(b'V' as u16);
-    let inputs = [
-        key(VK_CONTROL, false),
-        key(v, false),
-        key(v, true),
-        key(VK_CONTROL, true),
-    ];
-    unsafe {
-        SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
-    }
-}
-
-/// Windows needs no permission to send keystrokes.
-pub fn can_paste(_prompt: bool) -> bool {
-    true
 }

@@ -1,32 +1,10 @@
-//! macOS side of the clipboard history: NSPasteboard's change counter, the app that
-//! was in front, and pasting with a synthetic ⌘V (needs Accessibility).
+//! macOS side of the clipboard history: NSPasteboard's change counter, items to skip,
+//! and the app that was in front.
 
-use std::{
-    ffi::c_void,
-    sync::atomic::{AtomicI32, Ordering},
-};
+use std::sync::atomic::{AtomicI32, Ordering};
 
 use objc2::{class, msg_send, rc::autoreleasepool, runtime::AnyObject};
-use objc2_foundation::{NSArray, NSDictionary, NSNumber, NSString};
-
-#[link(name = "CoreGraphics", kind = "framework")]
-extern "C" {
-    fn CGEventSourceCreate(state_id: i32) -> *mut c_void;
-    fn CGEventCreateKeyboardEvent(source: *mut c_void, key: u16, down: bool) -> *mut c_void;
-    fn CGEventSetFlags(event: *mut c_void, flags: u64);
-    fn CGEventPost(tap: u32, event: *mut c_void);
-}
-
-#[link(name = "CoreFoundation", kind = "framework")]
-extern "C" {
-    fn CFRelease(object: *const c_void);
-}
-
-#[link(name = "ApplicationServices", kind = "framework")]
-extern "C" {
-    fn AXIsProcessTrusted() -> bool;
-    fn AXIsProcessTrustedWithOptions(options: *const c_void) -> bool;
-}
+use objc2_foundation::{NSArray, NSString};
 
 /// Pasteboard types that password managers and similar apps add to say "don't keep
 /// this" (see nspasteboard.org).
@@ -100,43 +78,4 @@ pub fn activate_previous() {
             let _: bool = msg_send![app, activateWithOptions: 2usize];
         }
     });
-}
-
-/// Types ⌘V into the app in front.
-pub fn send_paste() {
-    const KEY_V: u16 = 9; // kVK_ANSI_V
-    const COMMAND: u64 = 1 << 20; // kCGEventFlagMaskCommand
-    const COMBINED_SESSION_STATE: i32 = 0;
-    const SESSION_EVENT_TAP: u32 = 1;
-    unsafe {
-        let source = CGEventSourceCreate(COMBINED_SESSION_STATE);
-        for down in [true, false] {
-            let event = CGEventCreateKeyboardEvent(source, KEY_V, down);
-            if event.is_null() {
-                continue;
-            }
-            CGEventSetFlags(event, COMMAND);
-            CGEventPost(SESSION_EVENT_TAP, event);
-            CFRelease(event);
-        }
-        if !source.is_null() {
-            CFRelease(source);
-        }
-    }
-}
-
-/// Whether Kadro may send keystrokes to other apps. With `prompt`, macOS shows its
-/// "allow Accessibility" dialog and adds Kadro to the list in System Settings.
-pub fn can_paste(prompt: bool) -> bool {
-    if !prompt {
-        return unsafe { AXIsProcessTrusted() };
-    }
-    let key = NSString::from_str("AXTrustedCheckOptionPrompt");
-    let value = NSNumber::new_bool(true);
-    let options = NSDictionary::from_slices(&[&*key], &[&*value]);
-    unsafe {
-        AXIsProcessTrustedWithOptions(
-            &*options as *const NSDictionary<NSString, NSNumber> as *const c_void,
-        )
-    }
 }

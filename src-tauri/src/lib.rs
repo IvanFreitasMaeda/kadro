@@ -47,7 +47,6 @@ pub fn run() {
             clipboard::clip_delete,
             clipboard::clip_clear,
             clipboard::set_clip_retention,
-            clipboard::set_clip_autopaste,
             history::history_list,
             history::history_copy,
             history::history_save,
