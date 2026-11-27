@@ -1,6 +1,6 @@
 [package]
 name = "kadro"
-version = "0.2.5"
+version = "0.3.0"
 description = "Captura de tela rápida para macOS e Windows"
 authors = ["Ivan Freitas Maeda"]
 license = "MIT"
@@ -39,7 +39,7 @@ gif = "0.14"
 objc2 = "0.6"
 block2 = "0.6"
 dispatch2 = "0.3"
-objc2-foundation = { version = "0.3", features = ["NSArray", "NSData", "NSDictionary", "NSError", "NSRange", "NSString", "NSURL", "NSValue"] }
+objc2-foundation = { version = "0.3", features = ["NSArray", "NSData", "NSDictionary", "NSEnumerator", "NSError", "NSRange", "NSString", "NSURL", "NSValue"] }
 objc2-screen-capture-kit = "0.3"
 objc2-av-foundation = { version = "0.3", features = ["AVAssetWriter", "AVAssetWriterInput", "AVMediaFormat", "AVVideoSettings"] }
 objc2-core-media = { version = "0.3", features = ["CMSampleBuffer", "CMTime"] }

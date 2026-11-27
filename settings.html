@@ -42,6 +42,11 @@
           <button class="shortcut" data-kind="record" title="Clique e pressione a nova combinação"></button>
           <button class="reset" data-reset="record" title="Voltar ao padrão">↺</button>
         </div>
+        <div class="row">
+          <span class="label">Histórico da área de transferência</span>
+          <button class="shortcut" data-kind="clipboard" title="Clique e pressione a nova combinação"></button>
+          <button class="reset" data-reset="clipboard" title="Voltar ao padrão">↺</button>
+        </div>
         <p id="status" class="hint">Clique num atalho e pressione a nova combinação. <kbd>Esc</kbd> cancela.</p>
       </section>
       <section>
@@ -59,6 +64,29 @@
             <option value="30">Últimas 30</option>
             <option value="100">Últimas 100</option>
           </select>
+        </div>
+      </section>
+      <section>
+        <h2>Área de transferência</h2>
+        <div class="row">
+          <span class="label">Guardar</span>
+          <select id="clip-limit" title="Quantos itens copiados ficam no histórico (os fixados não contam)">
+            <option value="0">Desativado</option>
+            <option value="25">Últimos 25</option>
+            <option value="50">Últimos 50</option>
+            <option value="100">Últimos 100</option>
+            <option value="250">Últimos 250</option>
+          </select>
+          <select id="clip-days" title="Itens mais antigos que isso são apagados (os fixados ficam)">
+            <option value="1">por 1 dia</option>
+            <option value="7">por 7 dias</option>
+            <option value="30">por 30 dias</option>
+            <option value="0">sem prazo</option>
+          </select>
+        </div>
+        <div class="row">
+          <span class="label">Apagar tudo, inclusive os fixados</span>
+          <button id="clip-clear" class="secondary">Apagar</button>
         </div>
       </section>
       <footer>

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, Wry};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
-use crate::{capture, config, gallery, record, tray};
+use crate::{capture, clipboard, config, gallery, record, tray};
 
 /// Select an area (Cmd+Shift+2 on macOS, Ctrl+Shift+2 on Windows).
 pub const DEFAULT_AREA: &str = "CommandOrControl+Shift+2";
@@ -16,6 +16,8 @@ pub const DEFAULT_GALLERY: &str = "CommandOrControl+Shift+0";
 pub const DEFAULT_RECORD: &str = "CommandOrControl+Shift+9";
 /// Copy the text in an area (OCR).
 pub const DEFAULT_TEXT: &str = "CommandOrControl+Shift+8";
+/// Clipboard history, like Windows' Win+V.
+pub const DEFAULT_CLIPBOARD: &str = "CommandOrControl+Shift+V";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -25,14 +27,16 @@ pub enum Kind {
     Gallery,
     Record,
     Text,
+    Clipboard,
 }
 
-pub const ALL: [Kind; 5] = [
+pub const ALL: [Kind; 6] = [
     Kind::Area,
     Kind::Full,
     Kind::Gallery,
     Kind::Record,
     Kind::Text,
+    Kind::Clipboard,
 ];
 
 /// The accelerator currently configured for `kind`.
@@ -45,6 +49,7 @@ pub fn current(app: &AppHandle, kind: Kind) -> String {
         Kind::Gallery => config.shortcut_gallery.clone(),
         Kind::Record => config.shortcut_record.clone(),
         Kind::Text => config.shortcut_text.clone(),
+        Kind::Clipboard => config.shortcut_clipboard.clone(),
     }
     .unwrap_or_else(|| default(kind).to_string())
 }
@@ -56,6 +61,7 @@ fn default(kind: Kind) -> &'static str {
         Kind::Gallery => DEFAULT_GALLERY,
         Kind::Record => DEFAULT_RECORD,
         Kind::Text => DEFAULT_TEXT,
+        Kind::Clipboard => DEFAULT_CLIPBOARD,
     }
 }
 
@@ -80,6 +86,7 @@ pub fn plugin() -> tauri::plugin::TauriPlugin<Wry> {
                 Some(Kind::Record) => record::toggle(app),
                 Some(Kind::Full) => capture::start(app, true),
                 Some(Kind::Text) => capture::start_text(app),
+                Some(Kind::Clipboard) => clipboard::toggle(app),
                 _ => capture::start(app, false),
             }
         })
@@ -136,6 +143,7 @@ pub fn set(app: &AppHandle, kind: Kind, accelerator: Option<String>) -> Result<S
             Kind::Gallery => config.shortcut_gallery = value,
             Kind::Record => config.shortcut_record = value,
             Kind::Text => config.shortcut_text = value,
+            Kind::Clipboard => config.shortcut_clipboard = value,
         }
         config::store(app, &config)?;
     }

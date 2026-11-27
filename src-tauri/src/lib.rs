@@ -1,5 +1,6 @@
 mod autostart;
 mod capture;
+mod clipboard;
 mod config;
 mod fileclip;
 mod gallery;
@@ -39,6 +40,13 @@ pub fn run() {
             capture::recognize_text,
             capture::copy_text,
             gallery::close_gallery,
+            clipboard::popup::close_clipboard,
+            clipboard::clip_list,
+            clipboard::clip_use,
+            clipboard::clip_pin,
+            clipboard::clip_delete,
+            clipboard::clip_clear,
+            clipboard::set_clip_retention,
             history::history_list,
             history::history_copy,
             history::history_save,
@@ -70,6 +78,7 @@ pub fn run() {
             autostart::init(handle);
             tray::create(handle)?;
             shortcuts::register_all(handle);
+            clipboard::start(handle);
             updater::start(handle);
             Ok(())
         })

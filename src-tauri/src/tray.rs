@@ -9,7 +9,7 @@ use tauri::{
 use tauri_plugin_opener::OpenerExt;
 
 use crate::{
-    capture, config, gallery, record, settings,
+    capture, clipboard, config, gallery, record, settings,
     shortcuts::{self, Kind},
     updater,
 };
@@ -21,6 +21,7 @@ pub struct TrayItems {
     gallery: MenuItem<Wry>,
     record: MenuItem<Wry>,
     text: MenuItem<Wry>,
+    clipboard: MenuItem<Wry>,
     update: MenuItem<Wry>,
 }
 
@@ -65,6 +66,13 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         true,
         Some(shortcuts::current(app, Kind::Gallery)),
     )?;
+    let clipboard = MenuItem::with_id(
+        app,
+        "clipboard",
+        "Histórico da área de transferência",
+        true,
+        Some(shortcuts::current(app, Kind::Clipboard)),
+    )?;
     let update = MenuItem::with_id(app, "update", UPDATE_LABEL, true, None::<&str>)?;
     let version = MenuItem::with_id(
         app,
@@ -82,6 +90,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
             &record,
             &PredefinedMenuItem::separator(app)?,
             &gallery,
+            &clipboard,
             &MenuItem::with_id(
                 app,
                 "open_dir",
@@ -104,6 +113,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         gallery,
         record,
         text,
+        clipboard,
         update,
     });
 
@@ -129,6 +139,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
             "text" => capture::start_text(app),
             "record" => record::toggle(app),
             "gallery" => gallery::toggle(app),
+            "clipboard" => clipboard::toggle(app),
             "open_dir" => open_save_dir(app),
             "settings" => settings::open(app),
             "update" => updater::check_now(app),
@@ -185,6 +196,9 @@ pub fn refresh_accelerators(app: &AppHandle) {
     let _ = items
         .text
         .set_accelerator(Some(shortcuts::current(app, Kind::Text)));
+    let _ = items
+        .clipboard
+        .set_accelerator(Some(shortcuts::current(app, Kind::Clipboard)));
 }
 
 /// Switches the menu and tooltip between "record" and "stop".

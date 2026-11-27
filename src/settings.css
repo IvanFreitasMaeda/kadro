@@ -131,3 +131,6 @@ input[type="checkbox"] {
   accent-color: var(--accent);
   cursor: pointer;
 }
+
+button.danger { color: #fff; background: var(--error); border-color: var(--error); }
+select:disabled { opacity: 0.5; }

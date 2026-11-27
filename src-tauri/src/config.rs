@@ -20,6 +20,14 @@ pub struct Config {
     pub shortcut_record: Option<String>,
     /// Global shortcut that copies the text in an area (OCR). `None` means the default.
     pub shortcut_text: Option<String>,
+    /// Global shortcut for the clipboard history. `None` means the default.
+    pub shortcut_clipboard: Option<String>,
+    /// How many clipboard items are kept (pinned ones aside); 0 turns it off.
+    /// `None` means the default.
+    pub clip_limit: Option<usize>,
+    /// Clipboard items older than this many days are dropped; 0 keeps them.
+    /// `None` means the default.
+    pub clip_days: Option<u32>,
     /// MP4 or GIF, as picked in the last recording.
     pub record_format: Option<crate::record::Format>,
     /// How many recent captures the gallery keeps; 0 turns the history off.

@@ -136,14 +136,20 @@ fn open_overlays(app: &AppHandle, mode: Mode) -> Result<(), String> {
         .unwrap_or_default();
 
     for (i, (pos, size)) in placements.into_iter().enumerate() {
-        let under_cursor = cursor.is_some_and(|c| {
-            c.x >= pos.x as f64
-                && c.y >= pos.y as f64
-                && c.x < (pos.x + size.width as i32) as f64
-                && c.y < (pos.y + size.height as i32) as f64
-        });
+        let under_cursor = match cursor {
+            Some(c) => {
+                c.x >= pos.x as f64
+                    && c.y >= pos.y as f64
+                    && c.x < (pos.x + size.width as i32) as f64
+                    && c.y < (pos.y + size.height as i32) as f64
+            }
+            None => i == 0,
+        };
+        // Only the overlay under the cursor takes focus. With several monitors every
+        // overlay used to grab it as it loaded, so the last one to load won, often on
+        // the other monitor, and on macOS the first click only activated the window.
         let init = format!(
-            "window.__KADRO__ = {{ monitor: {i}, nonce: {nonce}, full: {}, record: {}, ocr: {}, format: \"{}\" }};",
+            "window.__KADRO__ = {{ monitor: {i}, nonce: {nonce}, full: {}, focus: {under_cursor}, record: {}, ocr: {}, format: \"{}\" }};",
             mode == Mode::Full && under_cursor,
             mode == Mode::Record,
             mode == Mode::Text,
@@ -163,7 +169,10 @@ fn open_overlays(app: &AppHandle, mode: Mode) -> Result<(), String> {
         .visible_on_all_workspaces(true)
         .shadow(false)
         .visible(false)
-        .focused(true);
+        .focused(under_cursor)
+        // macOS: a click on an overlay that isn't the key window still starts the
+        // selection instead of only activating the window.
+        .accept_first_mouse(true);
 
         // macOS: xcap reports the display frame in points with a top-left origin, which
         // is exactly what Tauri's logical coordinates are. Creating the window with its
@@ -265,6 +274,20 @@ pub fn serve_shot<R: Runtime>(
         .decode_utf8_lossy()
         .into_owned();
     std::thread::spawn(move || {
+        // Clipboard history thumbnails: `c/<id>.jpg`.
+        if let Some(name) = path.trim_start_matches('/').strip_prefix("c/") {
+            let response = match crate::clipboard::serve(&app, name) {
+                Some((bytes, mime)) => http::Response::builder()
+                    .header(http::header::CONTENT_TYPE, mime)
+                    .header(http::header::CACHE_CONTROL, "max-age=31536000, immutable")
+                    .body(bytes),
+                None => http::Response::builder()
+                    .status(http::StatusCode::NOT_FOUND)
+                    .body(Vec::new()),
+            };
+            responder.respond(response.unwrap());
+            return;
+        }
         // Gallery images: `h/<id>.jpg` or `h/<id>.png`.
         if let Some(name) = path.trim_start_matches('/').strip_prefix("h/") {
             let response = match history::serve(&app, name) {
