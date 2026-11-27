@@ -3,7 +3,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { pretty as prettyFor } from "./keys";
 
-type Kind = "area" | "full" | "gallery" | "record" | "text" | "clipboard";
+type Kind = "area" | "full" | "gallery" | "record" | "text" | "clipboard" | "draw";
 type Settings = {
   shortcut_area: string;
   shortcut_full: string;
@@ -11,6 +11,7 @@ type Settings = {
   shortcut_record: string;
   shortcut_text: string;
   shortcut_clipboard: string;
+  shortcut_draw: string;
   history_limit: number;
   clip_limit: number;
   clip_days: number;
@@ -29,7 +30,7 @@ document.querySelectorAll<HTMLButtonElement>(".shortcut").forEach((b) => {
 let isMac = navigator.userAgent.includes("Mac");
 const pretty = (accelerator: string) => prettyFor(accelerator, isMac);
 let recording: Kind | null = null;
-const values: Record<Kind, string> = { area: "", full: "", gallery: "", record: "", text: "", clipboard: "" };
+const values: Record<Kind, string> = { area: "", full: "", gallery: "", record: "", text: "", clipboard: "", draw: "" };
 const autostartEl = document.getElementById("autostart") as HTMLInputElement;
 const historyEl = document.getElementById("history-limit") as HTMLSelectElement;
 const clipLimitEl = document.getElementById("clip-limit") as HTMLSelectElement;
@@ -216,6 +217,7 @@ async function init() {
   values.record = s.shortcut_record;
   values.text = s.shortcut_text;
   values.clipboard = s.shortcut_clipboard;
+  values.draw = s.shortcut_draw;
   for (const [el, value, label] of [
     [clipLimitEl, s.clip_limit, `Últimos ${s.clip_limit}`],
     [clipDaysEl, s.clip_days, `por ${s.clip_days} dias`],

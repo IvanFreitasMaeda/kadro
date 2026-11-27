@@ -29,6 +29,17 @@ mod platform {
 
 pub use popup::toggle;
 
+/// Remembers the app in front, to give it the focus back later (also used by the
+/// recording's draw mode).
+pub fn remember_foreground() {
+    platform::remember_foreground();
+}
+
+/// Brings back the app remembered by [`remember_foreground`].
+pub fn activate_previous() {
+    platform::activate_previous();
+}
+
 use std::{
     fs,
     hash::{Hash, Hasher},

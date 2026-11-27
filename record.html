@@ -12,6 +12,21 @@
       <span id="time" data-tauri-drag-region>Preparando…</span>
       <span id="format" data-tauri-drag-region></span>
     </div>
+    <div id="tools">
+      <div class="group" id="tool-buttons"></div>
+      <div class="group" id="colors"></div>
+      <div class="group">
+        <button id="fade" class="icon" aria-label="Apagar sozinho">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8" /><path d="M12 9v4l2.5 2.5M9 2h6" /></svg>
+        </button>
+        <button id="clear" class="icon" aria-label="Limpar desenhos">
+          <svg viewBox="0 0 24 24"><path d="M20 20H9l-5-5a2 2 0 0 1 0-2.8L13.2 3a2 2 0 0 1 2.8 0l4 4a2 2 0 0 1 0 2.8L11 19M8.5 8.5l7 7" /></svg>
+        </button>
+      </div>
+    </div>
+    <button id="draw" class="icon" disabled aria-label="Desenhar na tela">
+      <svg viewBox="0 0 24 24"><path d="M4 20l4-1 11-11a2.1 2.1 0 0 0-3-3L5 16l-1 4zM14 7l3 3" /></svg>
+    </button>
     <button id="stop" class="stop" disabled aria-label="Parar e salvar">
       <svg viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2" /></svg>
       Parar

@@ -18,6 +18,9 @@ pub const DEFAULT_RECORD: &str = "CommandOrControl+Shift+9";
 pub const DEFAULT_TEXT: &str = "CommandOrControl+Shift+8";
 /// Clipboard history, like Windows' Win+V.
 pub const DEFAULT_CLIPBOARD: &str = "CommandOrControl+Shift+V";
+/// Draw on the screen while recording. Only registered during a recording, so it
+/// doesn't take the combination away from other apps the rest of the time.
+pub const DEFAULT_DRAW: &str = "CommandOrControl+Shift+D";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -28,15 +31,17 @@ pub enum Kind {
     Record,
     Text,
     Clipboard,
+    Draw,
 }
 
-pub const ALL: [Kind; 6] = [
+pub const ALL: [Kind; 7] = [
     Kind::Area,
     Kind::Full,
     Kind::Gallery,
     Kind::Record,
     Kind::Text,
     Kind::Clipboard,
+    Kind::Draw,
 ];
 
 /// The accelerator currently configured for `kind`.
@@ -50,6 +55,7 @@ pub fn current(app: &AppHandle, kind: Kind) -> String {
         Kind::Record => config.shortcut_record.clone(),
         Kind::Text => config.shortcut_text.clone(),
         Kind::Clipboard => config.shortcut_clipboard.clone(),
+        Kind::Draw => config.shortcut_draw.clone(),
     }
     .unwrap_or_else(|| default(kind).to_string())
 }
@@ -62,6 +68,7 @@ fn default(kind: Kind) -> &'static str {
         Kind::Record => DEFAULT_RECORD,
         Kind::Text => DEFAULT_TEXT,
         Kind::Clipboard => DEFAULT_CLIPBOARD,
+        Kind::Draw => DEFAULT_DRAW,
     }
 }
 
@@ -87,6 +94,7 @@ pub fn plugin() -> tauri::plugin::TauriPlugin<Wry> {
                 Some(Kind::Full) => capture::start(app, true),
                 Some(Kind::Text) => capture::start_text(app),
                 Some(Kind::Clipboard) => clipboard::toggle(app),
+                Some(Kind::Draw) => record::draw::toggle(app),
                 _ => capture::start(app, false),
             }
         })
@@ -97,10 +105,26 @@ pub fn plugin() -> tauri::plugin::TauriPlugin<Wry> {
 /// combination, and the tray icon still works.
 pub fn register_all(app: &AppHandle) {
     for kind in ALL {
+        if kind == Kind::Draw && !record::is_recording(app) {
+            continue;
+        }
         let accelerator = current(app, kind);
         if let Err(err) = app.global_shortcut().register(accelerator.as_str()) {
             log::warn!("could not register {accelerator}: {err}");
         }
+    }
+}
+
+/// Registers (`true`) or drops the draw shortcut when a recording starts or stops.
+pub fn set_draw(app: &AppHandle, on: bool) {
+    let accelerator = current(app, Kind::Draw);
+    let result = if on {
+        app.global_shortcut().register(accelerator.as_str())
+    } else {
+        app.global_shortcut().unregister(accelerator.as_str())
+    };
+    if let Err(err) = result {
+        log::warn!("draw shortcut {accelerator}: {err}");
     }
 }
 
@@ -144,6 +168,7 @@ pub fn set(app: &AppHandle, kind: Kind, accelerator: Option<String>) -> Result<S
             Kind::Record => config.shortcut_record = value,
             Kind::Text => config.shortcut_text = value,
             Kind::Clipboard => config.shortcut_clipboard = value,
+            Kind::Draw => config.shortcut_draw = value,
         }
         config::store(app, &config)?;
     }
