@@ -29,12 +29,21 @@ struct Mode {
 pub fn open(app: &AppHandle, target: &Target) -> Result<(), String> {
     close(app);
     DRAWING.store(false, Ordering::SeqCst);
+    // An X11 desktop without a compositor can't show a transparent window: it would
+    // cover the recorded area in black. No drawing there.
+    #[cfg(target_os = "linux")]
+    if !crate::linux::x11::has_compositor() {
+        log::info!("no compositor: drawing while recording is off");
+        return Ok(());
+    }
     let builder = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("draw.html".into()))
         .title("Desenho do Kadro")
         .transparent(true)
         .decorations(false)
         .shadow(false)
-        .resizable(false)
+        // GTK can't shrink a fixed-size window below its first size (800x600):
+        // Linux keeps it resizable, which without decorations changes nothing visible.
+        .resizable(cfg!(target_os = "linux"))
         .maximizable(false)
         .minimizable(false)
         .always_on_top(true)
@@ -74,6 +83,22 @@ pub fn open(app: &AppHandle, target: &Target) -> Result<(), String> {
         window
     };
 
+    // Linux (GTK) can only change the input region of a window that is on screen,
+    // and draw.ts shows it once its page is up: wait for that.
+    #[cfg(target_os = "linux")]
+    {
+        let window = window.clone();
+        std::thread::spawn(move || {
+            for _ in 0..200 {
+                if window.is_visible().unwrap_or(false) {
+                    let _ = window.set_ignore_cursor_events(!DRAWING.load(Ordering::SeqCst));
+                    return;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(15));
+            }
+        });
+    }
+    #[cfg(not(target_os = "linux"))]
     window
         .set_ignore_cursor_events(true)
         .map_err(|e| e.to_string())?;
@@ -102,8 +127,12 @@ fn set(app: &AppHandle, on: bool) {
     if was == on {
         return;
     }
-    if let Err(err) = window.set_ignore_cursor_events(!on) {
-        log::warn!("draw overlay: {err}");
+    // Linux: not on screen yet; `open` applies the mode once it is (GTK would crash).
+    let ready = !cfg!(target_os = "linux") || window.is_visible().unwrap_or(false);
+    if ready {
+        if let Err(err) = window.set_ignore_cursor_events(!on) {
+            log::warn!("draw overlay: {err}");
+        }
     }
     if on {
         // Keys (Esc, undo, tools) go to the overlay; give the focus back afterwards.

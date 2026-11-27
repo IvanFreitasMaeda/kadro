@@ -7,7 +7,7 @@ import { pretty } from "./keys";
 
 declare global {
   interface Window {
-    __KADRO_REC__?: { format: "mp4" | "gif" };
+    __KADRO_REC__?: { format: "mp4" | "gif"; draw?: boolean };
   }
 }
 
@@ -28,6 +28,8 @@ const tools = $("tools");
 const isMac = navigator.userAgent.includes("Mac");
 
 const format = window.__KADRO_REC__?.format ?? "mp4";
+// Linux without a compositor can't draw on the screen: no pencil there.
+if (window.__KADRO_REC__?.draw === false) drawBtn.hidden = true;
 $("format").textContent = format.toUpperCase();
 
 let started = 0;

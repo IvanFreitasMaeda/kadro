@@ -1,4 +1,5 @@
-//! Launch at login (macOS LaunchAgent, Windows "Run" registry key).
+//! Launch at login (macOS LaunchAgent, Windows "Run" registry key, Linux
+//! ~/.config/autostart; for an AppImage it points at the AppImage file).
 //!
 //! Kadro starts with no window, only the tray icon, so launching at login is silent.
 //! It is turned on once, on the first launch; after that the system's own state is

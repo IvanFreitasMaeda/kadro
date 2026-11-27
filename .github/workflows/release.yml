@@ -1,6 +1,6 @@
 name: Release
 
-# Publica uma release no GitHub com os instaladores do Mac e do Windows.
+# Publica uma release no GitHub com os instaladores do Mac, do Windows e do Linux.
 # Dois jeitos de disparar:
 #   - enviar uma tag de versão (ex.: v0.1.0), que precisa ser igual à de src-tauri/tauri.conf.json;
 #   - na aba Actions, "Run workflow" na main: usa a versão de tauri.conf.json e cria a tag sozinho.
@@ -29,6 +29,13 @@ jobs:
           - name: windows-x64
             runner: windows-latest
             target: x86_64-pc-windows-msvc
+          - name: linux-x64
+            runner: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - name: linux-arm64
+            runner: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
+          # (Linux: AppImage, .deb e .rpm; ubuntu-22.04 para rodar em distros mais antigas também.)
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -65,6 +72,10 @@ jobs:
             exit 1
           fi
 
+      - name: Dependências do Linux
+        if: runner.os == 'Linux'
+        run: .github/scripts/linux-deps.sh
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -98,6 +109,14 @@ jobs:
             cp "$bundle"/dmg/*.dmg out/Kadro-macOS-AppleSilicon.dmg
             cp "$bundle"/macos/*.app.tar.gz out/Kadro-macOS-AppleSilicon.app.tar.gz
             cp "$bundle"/macos/*.app.tar.gz.sig out/Kadro-macOS-AppleSilicon.app.tar.gz.sig
+          elif [ "${{ runner.os }}" = "Linux" ]; then
+            arch=$([ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ] && echo arm64 || echo x86_64)
+            cp "$bundle"/appimage/*.AppImage "out/Kadro-Linux-$arch.AppImage"
+            cp "$bundle"/appimage/*.AppImage.sig "out/Kadro-Linux-$arch.AppImage.sig"
+            cp "$bundle"/deb/*.deb "out/Kadro-Linux-$arch.deb"
+            cp "$bundle"/deb/*.deb.sig "out/Kadro-Linux-$arch.deb.sig"
+            cp "$bundle"/rpm/*.rpm "out/Kadro-Linux-$arch.rpm"
+            cp "$bundle"/rpm/*.rpm.sig "out/Kadro-Linux-$arch.rpm.sig"
           else
             cp "$bundle"/nsis/*.exe out/Kadro-Windows-Setup.exe
             cp "$bundle"/nsis/*.exe.sig out/Kadro-Windows-Setup.exe.sig
@@ -145,6 +164,15 @@ jobs:
               'windows-x86_64': entry('Kadro-Windows-Setup.exe'),
             },
           };
+          // Linux: the app looks for "linux-<arch>-<appimage|deb|rpm>" first, so each
+          // kind of install updates with its own kind of file.
+          for (const [arch, name] of [['x86_64', 'x86_64'], ['aarch64', 'arm64']]) {
+            const appimage = entry(`Kadro-Linux-${name}.AppImage`);
+            manifest.platforms[`linux-${arch}`] = appimage;
+            manifest.platforms[`linux-${arch}-appimage`] = appimage;
+            manifest.platforms[`linux-${arch}-deb`] = entry(`Kadro-Linux-${name}.deb`);
+            manifest.platforms[`linux-${arch}-rpm`] = entry(`Kadro-Linux-${name}.rpm`);
+          }
           fs.writeFileSync('dist/latest.json', JSON.stringify(manifest, null, 2));
           EOF
           rm dist/*.sig

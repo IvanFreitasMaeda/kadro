@@ -1,6 +1,6 @@
 //! Text recognition (OCR) on captures, with the OCR built into the OS: the Vision
-//! framework on macOS and Windows.Media.Ocr on Windows. Nothing is bundled and
-//! nothing leaves the computer.
+//! framework on macOS and Windows.Media.Ocr on Windows; on Linux, Tesseract when it
+//! is installed. Nothing is bundled and nothing leaves the computer.
 
 use image::RgbaImage;
 use serde::Serialize;
@@ -268,18 +268,161 @@ mod platform {
     }
 }
 
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+/// Linux has no OCR of its own: Kadro uses Tesseract when it is installed (most
+/// distributions package it), so nothing heavy ships with the app.
+#[cfg(target_os = "linux")]
 mod platform {
-    use super::Line;
+    use std::{
+        io::Write,
+        process::{Command, Stdio},
+        sync::OnceLock,
+    };
 
-    pub fn recognize(_img: &image::RgbaImage) -> Result<Vec<Line>, String> {
-        Err("O reconhecimento de texto ainda não está disponível neste sistema.".into())
+    use image::{imageops, RgbaImage};
+
+    use super::{Line, Word};
+
+    const MISSING: &str = "Para copiar texto de imagens no Linux, instale o Tesseract:\n\n\
+        Ubuntu/Debian: sudo apt install tesseract-ocr tesseract-ocr-por\n\
+        Fedora: sudo dnf install tesseract tesseract-langpack-por\n\
+        Arch: sudo pacman -S tesseract tesseract-data-por tesseract-data-eng";
+
+    /// The languages to read: Portuguese and English when installed.
+    fn languages() -> Option<&'static str> {
+        static LANGS: OnceLock<Option<String>> = OnceLock::new();
+        LANGS
+            .get_or_init(|| {
+                let out = Command::new("tesseract").arg("--list-langs").output().ok()?;
+                let text = String::from_utf8_lossy(&out.stdout).to_string()
+                    + &String::from_utf8_lossy(&out.stderr);
+                let installed: Vec<&str> = text.lines().map(str::trim).collect();
+                let wanted: Vec<&str> = ["por", "eng"]
+                    .into_iter()
+                    .filter(|l| installed.contains(l))
+                    .collect();
+                Some(wanted.join("+"))
+            })
+            .as_deref()
+    }
+
+    pub fn recognize(img: &RgbaImage) -> Result<Vec<Line>, String> {
+        let langs = languages().ok_or_else(|| MISSING.to_string())?;
+        // Screen text is small for Tesseract, which was made for scans: reading it
+        // at two or three times the size is much more accurate.
+        let side = img.width().max(img.height());
+        let scale = match side {
+            0..=1400 => 3,
+            1401..=2800 => 2,
+            _ => 1,
+        };
+        let input = if scale > 1 {
+            imageops::resize(
+                img,
+                img.width() * scale,
+                img.height() * scale,
+                imageops::FilterType::CatmullRom,
+            )
+        } else {
+            img.clone()
+        };
+        let png = crate::capture::encode_png(&input, image::codecs::png::CompressionType::Fast)?;
+
+        let mut cmd = Command::new("tesseract");
+        // Sparse text: screenshots are UI and scattered labels more than pages. Lines are
+        // put together afterwards from the word positions.
+        cmd.args(["stdin", "stdout", "--psm", "11"]);
+        if !langs.is_empty() {
+            cmd.args(["-l", langs]);
+        }
+        let mut child = cmd
+            .arg("tsv")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .map_err(|_| MISSING.to_string())?;
+        let mut stdin = child.stdin.take().ok_or("tesseract")?;
+        let writer = std::thread::spawn(move || stdin.write_all(&png));
+        let out = child.wait_with_output().map_err(|e| e.to_string())?;
+        let _ = writer.join();
+        if !out.status.success() {
+            return Err("O Tesseract não conseguiu ler a imagem.".into());
+        }
+        Ok(parse_tsv(&String::from_utf8_lossy(&out.stdout), scale as f32))
+    }
+
+    /// Reads Tesseract's TSV (one row per word, level 5) into lines. Tesseract's own
+    /// grouping follows its layout guesses (a column of dates becomes a "block"), so
+    /// words are grouped by position instead: same height on screen, same line, read
+    /// left to right. Boxes are divided by `scale`.
+    pub fn parse_tsv(tsv: &str, scale: f32) -> Vec<Line> {
+        let mut words: Vec<Word> = Vec::new();
+        for row in tsv.lines().skip(1) {
+            let cols: Vec<&str> = row.splitn(12, '\t').collect();
+            if cols.len() < 12 || cols[0] != "5" {
+                continue;
+            }
+            let text = cols[11].trim();
+            if text.is_empty() {
+                continue;
+            }
+            let num = |i: usize| cols[i].parse::<f32>().unwrap_or(0.0);
+            words.push(Word {
+                text: text.to_string(),
+                x: num(6) / scale,
+                y: num(7) / scale,
+                w: num(8) / scale,
+                h: num(9) / scale,
+            });
+        }
+        words.sort_by(|a, b| (a.y + a.h / 2.0).total_cmp(&(b.y + b.h / 2.0)));
+        // (top, bottom) of each line, and its words.
+        let mut lines: Vec<(f32, f32, Vec<Word>)> = Vec::new();
+        for word in words {
+            let (top, bottom) = (word.y, word.y + word.h);
+            let fits = lines.iter_mut().rev().take(3).find(|(t, b, _)| {
+                let overlap = bottom.min(*b) - top.max(*t);
+                overlap > 0.5 * word.h.min(*b - *t)
+            });
+            match fits {
+                Some((t, b, list)) => {
+                    *t = t.min(top);
+                    *b = b.max(bottom);
+                    list.push(word);
+                }
+                None => lines.push((top, bottom, vec![word])),
+            }
+        }
+        lines.sort_by(|a, b| a.0.total_cmp(&b.0));
+        lines
+            .into_iter()
+            .map(|(_, _, mut words)| {
+                words.sort_by(|a, b| a.x.total_cmp(&b.x));
+                Line { words }
+            })
+            .collect()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::split_words;
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn reads_tesseract_tsv() {
+        let tsv = "level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n\
+            5\t1\t2\t1\t1\t1\t90\t12\t80\t20\t96\tmundo\n\
+            5\t1\t1\t1\t1\t1\t20\t10\t60\t20\t95\tOlá\n\
+            4\t1\t1\t1\t2\t0\t20\t40\t60\t20\t-1\t\n\
+            5\t1\t1\t1\t2\t1\t20\t40\t60\t20\t90\tde novo\n";
+        let lines = super::platform::parse_tsv(tsv, 2.0);
+        assert_eq!(lines.len(), 2);
+        assert_eq!(lines[0].words.len(), 2);
+        assert_eq!(lines[0].words[1].text, "mundo");
+        assert_eq!(lines[0].words[1].x, 45.0);
+        assert_eq!(lines[1].words[0].text, "de novo");
+    }
 
     #[test]
     fn splits_words_with_utf16_ranges() {

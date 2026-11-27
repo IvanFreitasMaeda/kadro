@@ -15,16 +15,13 @@ mod platform;
 #[cfg(target_os = "windows")]
 #[path = "windows.rs"]
 mod platform;
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+/// Linux: X11 (or XWayland, where Wayland apps' copies show up too).
+#[cfg(target_os = "linux")]
 mod platform {
-    pub fn change_count() -> i64 {
-        0
-    }
-    pub fn should_skip() -> bool {
-        false
-    }
-    pub fn remember_foreground() {}
-    pub fn activate_previous() {}
+    pub use crate::linux::x11::{
+        activate_previous, clipboard_change_count as change_count,
+        clipboard_is_secret as should_skip, remember_foreground,
+    };
 }
 
 pub use popup::toggle;
