@@ -65,6 +65,38 @@ pub struct Settings {
     save_dir: String,
     autostart: bool,
     platform: &'static str,
+    /// Linux on Wayland: how the shortcuts work there (portal or system commands).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    wayland_shortcuts: Option<serde_json::Value>,
+    /// The command that starts Kadro, for system shortcuts (`kadro --area`).
+    command: String,
+}
+
+#[cfg(target_os = "linux")]
+fn wayland_shortcuts() -> Option<serde_json::Value> {
+    crate::linux::is_wayland()
+        .then(|| serde_json::to_value(crate::linux::shortcuts::status()).ok())
+        .flatten()
+}
+
+#[cfg(not(target_os = "linux"))]
+fn wayland_shortcuts() -> Option<serde_json::Value> {
+    None
+}
+
+/// `kadro` when installed as a package, otherwise the full path (an AppImage).
+fn command() -> String {
+    if let Some(appimage) = std::env::var_os("APPIMAGE") {
+        return appimage.to_string_lossy().into_owned();
+    }
+    match std::env::current_exe() {
+        Ok(exe) if exe.starts_with("/usr/bin") || exe.starts_with("/usr/local/bin") => exe
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "kadro".into()),
+        Ok(exe) => exe.display().to_string(),
+        Err(_) => "kadro".into(),
+    }
 }
 
 #[tauri::command]
@@ -84,6 +116,8 @@ pub fn get_settings(app: AppHandle) -> Settings {
         save_dir: save_dir.display().to_string(),
         autostart: autostart::enabled(&app),
         platform: std::env::consts::OS,
+        wayland_shortcuts: wayland_shortcuts(),
+        command: command(),
     }
 }
 

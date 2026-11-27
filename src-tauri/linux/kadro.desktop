@@ -1,0 +1,37 @@
+[Desktop Entry]
+Type=Application
+Name={{name}}
+{{#if comment}}
+Comment={{comment}}
+{{/if}}
+Exec={{exec}}
+Icon={{icon}}
+Terminal=false
+Categories={{categories}}
+Keywords=screenshot;screen;capture;captura;print;record;gravar;gif;mp4;ocr;clipboard;
+StartupWMClass={{exec}}
+Actions=area;full;record;text;gallery;clipboard;
+
+[Desktop Action area]
+Name=Capturar área
+Exec={{exec}} --area
+
+[Desktop Action full]
+Name=Capturar tela inteira
+Exec={{exec}} --full
+
+[Desktop Action record]
+Name=Gravar tela
+Exec={{exec}} --record
+
+[Desktop Action text]
+Name=Copiar texto de uma área
+Exec={{exec}} --text
+
+[Desktop Action gallery]
+Name=Histórico de capturas
+Exec={{exec}} --gallery
+
+[Desktop Action clipboard]
+Name=Histórico da área de transferência
+Exec={{exec}} --clipboard

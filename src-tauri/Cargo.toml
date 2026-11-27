@@ -1,7 +1,7 @@
 [package]
 name = "kadro"
-version = "0.4.0"
-description = "Captura de tela rápida para macOS e Windows"
+version = "1.0.0"
+description = "Captura de tela rápida para macOS, Windows e Linux"
 authors = ["Ivan Freitas Maeda"]
 license = "MIT"
 edition = "2021"
@@ -64,6 +64,21 @@ windows = { version = "0.62", features = [
   "Win32_UI_Shell",
   "Win32_UI_WindowsAndMessaging",
 ] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Already pulled in by xcap: Wayland portals (screenshot, screen cast, global
+# shortcuts) over D-Bus, PipeWire for the screen cast frames, XCB for X11.
+ashpd = { version = "0.14", default-features = false, features = ["async-io", "screenshot", "screencast", "global_shortcuts", "pipewire"] }
+pipewire = "0.10"
+xcb = { version = "1.7", features = ["randr", "shm", "xfixes"] }
+futures-util = { version = "0.3", default-features = false }
+pollster = "1"
+async-io = "2"
+libc = "0.2"
+# MP4 on Linux: Cisco's OpenH264 (BSD) built from source, and a small MP4 muxer.
+openh264 = "0.9"
+mp4 = "0.14"
+bytes = "1"
 
 [profile.release]
 codegen-units = 1

@@ -79,7 +79,21 @@ pub fn copy_file(path: &Path) -> Result<(), String> {
     Ok(())
 }
 
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
-pub fn copy_file(_path: &Path) -> Result<(), String> {
-    Err("Copiar arquivos não é suportado neste sistema.".into())
+/// Linux: a `text/uri-list`, which file managers, chats
+/// and browsers paste as the file. The clipboard is kept alive, since on X11 the
+/// content lives in the process that copied it.
+#[cfg(target_os = "linux")]
+pub fn copy_file(path: &Path) -> Result<(), String> {
+    use std::sync::Mutex;
+    static CLIPBOARD: Mutex<Option<arboard::Clipboard>> = Mutex::new(None);
+    let mut guard = CLIPBOARD.lock().unwrap();
+    if guard.is_none() {
+        *guard = Some(arboard::Clipboard::new().map_err(|e| e.to_string())?);
+    }
+    guard
+        .as_mut()
+        .unwrap()
+        .set()
+        .file_list(&[path])
+        .map_err(|e| format!("não foi possível copiar o arquivo: {e}"))
 }

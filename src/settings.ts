@@ -12,6 +12,12 @@ type Settings = {
   shortcut_text: string;
   shortcut_clipboard: string;
   shortcut_draw: string;
+  wayland_shortcuts?:
+    | { state: "pending" }
+    | { state: "portal"; triggers: [string, string][] }
+    | { state: "commands"; reason: string }
+    | { state: "x11" };
+  command: string;
   history_limit: number;
   clip_limit: number;
   clip_days: number;
@@ -236,6 +242,58 @@ async function init() {
   dirEl.textContent = `\u200e${s.save_dir}\u200e`;
   dirEl.title = s.save_dir;
   render();
+  renderWayland(s);
+}
+
+const ACTIONS: [string, string][] = [
+  ["area", "Capturar área"],
+  ["full", "Capturar tela inteira"],
+  ["text", "Copiar texto de uma área"],
+  ["gallery", "Abrir o histórico"],
+  ["record", "Gravar tela (iniciar/parar)"],
+  ["clipboard", "Histórico da área de transferência"],
+];
+
+/** Linux on Wayland: the desktop owns the shortcuts. Say how they work there. */
+function renderWayland(s: Settings) {
+  const note = document.getElementById("wayland-note")!;
+  const w = s.wayland_shortcuts;
+  if (!w || w.state === "x11") return;
+  note.hidden = false;
+  note.replaceChildren();
+  const p = (text: string) => {
+    const el = document.createElement("p");
+    el.textContent = text;
+    note.append(el);
+  };
+  if (w.state === "pending") {
+    p("No Wayland, os atalhos são registrados pelo sistema. Confirme na janela que ele mostrar.");
+    setTimeout(() => void invoke<Settings>("get_settings").then(renderWayland), 1500);
+    return;
+  }
+  if (w.state === "portal") {
+    p("No Wayland, quem cuida dos atalhos é o sistema. Se ele trocou alguma combinação, valem estas:");
+    const ul = document.createElement("ul");
+    for (const [kind, label] of ACTIONS) {
+      const trigger = w.triggers.find(([k]) => k === kind)?.[1];
+      if (!trigger) continue;
+      const li = document.createElement("li");
+      li.textContent = `${label}: ${trigger}`;
+      ul.append(li);
+    }
+    note.append(ul);
+    return;
+  }
+  p("Este Wayland não deixa o Kadro registrar atalhos. Crie atalhos nas configurações de teclado do sistema com estes comandos:");
+  const ul = document.createElement("ul");
+  for (const [kind, label] of ACTIONS) {
+    const li = document.createElement("li");
+    const code = document.createElement("code");
+    code.textContent = `${s.command.includes(" ") ? `"${s.command}"` : s.command} --${kind}`;
+    li.append(`${label}: `, code);
+    ul.append(li);
+  }
+  note.append(ul);
 }
 
 void init();

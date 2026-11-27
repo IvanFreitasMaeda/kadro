@@ -22,8 +22,45 @@ const CHECK_EVERY: Duration = Duration::from_secs(24 * 60 * 60);
 /// Set while a check or a download runs, so two never overlap.
 static BUSY: AtomicBool = AtomicBool::new(false);
 
+/// Linux: whether this copy can update itself. An AppImage replaces its own file;
+/// the .deb and .rpm reinstall with `pkexec`. A package built by the distribution or
+/// the AUR (no dpkg/rpm, or not from our bundle) is updated by the package manager.
+#[cfg(target_os = "linux")]
+fn can_update() -> bool {
+    use tauri::utils::{config::BundleType, platform::bundle_type};
+    let has = |tool: &str| {
+        std::env::var_os("PATH").is_some_and(|paths| {
+            std::env::split_paths(&paths).any(|dir| dir.join(tool).is_file())
+        })
+    };
+    let owns = |cmd: &[&str]| {
+        std::process::Command::new(cmd[0])
+            .args(&cmd[1..])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .is_ok_and(|s| s.success())
+    };
+    match bundle_type() {
+        Some(BundleType::AppImage) => std::env::var_os("APPIMAGE").is_some(),
+        // The package database must own Kadro: the AUR package repackages the .deb,
+        // and an Arch machine may still have dpkg around.
+        Some(BundleType::Deb) => has("pkexec") && owns(&["dpkg-query", "-W", "kadro"]),
+        Some(BundleType::Rpm) => has("pkexec") && owns(&["rpm", "-q", "kadro"]),
+        _ => false,
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn can_update() -> bool {
+    true
+}
+
 /// Starts the background checks.
 pub fn start(app: &AppHandle) {
+    if !can_update() {
+        return;
+    }
     let app = app.clone();
     thread::spawn(move || {
         thread::sleep(FIRST_CHECK);
@@ -36,6 +73,16 @@ pub fn start(app: &AppHandle) {
 
 /// Manual check from the tray menu: also says when there is nothing new or it failed.
 pub fn check_now(app: &AppHandle) {
+    if !can_update() {
+        let app = app.clone();
+        thread::spawn(move || {
+            info(
+                &app,
+                "Este Kadro foi instalado pelo gerenciador de pacotes do sistema (ou do AUR). Atualize por ele, ou baixe a versão nova em github.com/IvanFreitasMaeda/kadro/releases.",
+            )
+        });
+        return;
+    }
     let app = app.clone();
     thread::spawn(move || run(&app, true));
 }

@@ -4,15 +4,18 @@
 //! bar shows the time and the stop button while the platform backend records:
 //! ScreenCaptureKit + AVAssetWriter on macOS, Windows Graphics Capture + Media
 //! Foundation on Windows. Both encode H.264 with the OS's own (hardware) encoder, so
-//! nothing heavy ships with the app. GIFs are encoded by `gif.rs` from the frames.
-
-// Linux builds (development only) have no backend, so the frame plumbing is unused.
-#![cfg_attr(not(any(target_os = "macos", target_os = "windows")), allow(dead_code))]
+//! nothing heavy ships with the app. On Linux, X11 (MIT-SHM) or the Wayland screen
+//! cast portal (PipeWire) provide the frames and OpenH264 encodes them (`linux.rs`,
+//! `mp4.rs`). GIFs are encoded by `gif.rs` from the frames.
 
 pub mod draw;
 mod gif;
+#[cfg(target_os = "linux")]
+mod linux;
 #[cfg(target_os = "macos")]
 mod macos;
+#[cfg(target_os = "linux")]
+mod mp4;
 #[cfg(target_os = "windows")]
 mod windows;
 
@@ -142,6 +145,7 @@ impl Feed {
     }
 
     /// Records that a frame arrived without handing over its pixels.
+    #[cfg_attr(target_os = "linux", allow(dead_code))]
     pub fn tick(&self, time: Duration) {
         *self.last.lock().unwrap() = Some((time, Instant::now()));
     }
@@ -333,13 +337,26 @@ fn prepare(
 }
 
 #[cfg(any(target_os = "macos", target_os = "windows"))]
-fn start_backend(target: &Target, feed: Arc<Feed>) -> Result<Box<dyn Backend>, String> {
+fn start_backend(
+    _app: &AppHandle,
+    target: &Target,
+    feed: Arc<Feed>,
+) -> Result<Box<dyn Backend>, String> {
     platform::start(target, feed)
 }
 
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
-fn start_backend(_target: &Target, _feed: Arc<Feed>) -> Result<Box<dyn Backend>, String> {
-    Err("A gravação de tela só funciona no macOS e no Windows.".into())
+#[cfg(target_os = "linux")]
+fn start_backend(app: &AppHandle, target: &Target, feed: Arc<Feed>) -> Result<Box<dyn Backend>, String> {
+    linux::start(app, target, feed)
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+fn start_backend(
+    _app: &AppHandle,
+    _target: &Target,
+    _feed: Arc<Feed>,
+) -> Result<Box<dyn Backend>, String> {
+    Err("A gravação de tela não funciona neste sistema.".into())
 }
 
 /// Runs off the main thread: opens the control bar, then starts the backend.
@@ -348,7 +365,7 @@ fn begin(app: &AppHandle, target: Target) {
     std::thread::sleep(Duration::from_millis(250));
     // The bar exists before capturing starts: on macOS that is what lets the
     // recording leave all of Kadro's windows out.
-    if let Err(err) = open_bar(app, target.format) {
+    if let Err(err) = open_bar(app, &target) {
         log::error!("could not open the recording bar: {err}");
     }
 
@@ -365,7 +382,7 @@ fn begin(app: &AppHandle, target: Target) {
         last: Mutex::new(None),
     });
 
-    match start_backend(&target, feed.clone()) {
+    match start_backend(app, &target, feed.clone()) {
         Ok(backend) => {
             // Created now, after capturing started, so the macOS recording keeps it in.
             if let Err(err) = draw::open(app, &target) {
@@ -492,7 +509,8 @@ fn finish(app: &AppHandle, active: Active, discard: bool) -> Result<Option<PathB
 
 // ---- Control bar ----
 
-fn open_bar(app: &AppHandle, format: Format) -> Result<(), String> {
+fn open_bar(app: &AppHandle, target: &Target) -> Result<(), String> {
+    let format = target.format;
     close_bar(app);
     // Bottom center of the screen under the cursor (where the user just clicked).
     let monitor = app
@@ -503,13 +521,22 @@ fn open_bar(app: &AppHandle, format: Format) -> Result<(), String> {
         .ok_or("nenhum monitor encontrado")?;
     let scale = monitor.scale_factor();
     let area = monitor.work_area();
-    let init = format!("window.__KADRO_REC__ = {{ format: \"{}\" }};", format.ext());
+    #[cfg(target_os = "linux")]
+    let can_draw = crate::linux::x11::has_compositor();
+    #[cfg(not(target_os = "linux"))]
+    let can_draw = true;
+    let init = format!(
+        "window.__KADRO_REC__ = {{ format: \"{}\", draw: {can_draw} }};",
+        format.ext()
+    );
 
     let builder = WebviewWindowBuilder::new(app, BAR_LABEL, WebviewUrl::App("record.html".into()))
         .title("Gravação do Kadro")
         .initialization_script(&init)
         .decorations(false)
-        .resizable(false)
+        // GTK can't shrink a fixed-size window below its first size (800x600):
+        // Linux keeps it resizable, which without decorations changes nothing visible.
+        .resizable(cfg!(target_os = "linux"))
         .maximizable(false)
         .minimizable(false)
         .always_on_top(true)
@@ -538,12 +565,19 @@ fn open_bar(app: &AppHandle, format: Format) -> Result<(), String> {
             (BAR_WIDTH * scale).round() as u32,
             (BAR_HEIGHT * scale).round() as u32,
         );
-        let pos = PhysicalPosition::new(
+        #[allow(unused_mut)]
+        let mut pos = PhysicalPosition::new(
             area.position.x + (area.size.width as i32 - size.width as i32) / 2,
             area.position.y + area.size.height as i32
                 - size.height as i32
                 - (BAR_MARGIN * scale).round() as i32,
         );
+        // Linux can't keep the bar out of the recording: put it just outside the
+        // recorded area when there is room.
+        #[cfg(target_os = "linux")]
+        if let Some(outside) = bar_outside(target, &area, size, scale) {
+            pos = outside;
+        }
         let window = builder.build().map_err(|e| e.to_string())?;
         window.set_size(size).map_err(|e| e.to_string())?;
         window.set_position(pos).map_err(|e| e.to_string())?;
@@ -559,6 +593,37 @@ fn open_bar(app: &AppHandle, format: Format) -> Result<(), String> {
 
     window.show().map_err(|e| e.to_string())?;
     Ok(())
+}
+
+/// Where the bar goes to stay out of the recorded area: below it, or above it, on the
+/// same monitor. `None` when neither fits (a full-screen recording).
+#[cfg(target_os = "linux")]
+fn bar_outside(
+    target: &Target,
+    area: &tauri::PhysicalRect<i32, u32>,
+    size: tauri::PhysicalSize<u32>,
+    scale: f64,
+) -> Option<tauri::PhysicalPosition<i32>> {
+    let m = &target.monitor;
+    let r = &target.rect;
+    let s = m.px_per_unit.max(0.01);
+    let left = m.x + (r.x as f64 / s) as i32;
+    let top = m.y + (r.y as f64 / s) as i32;
+    let right = left + (r.width as f64 / s) as i32;
+    let bottom = top + (r.height as f64 / s) as i32;
+    let gap = (12.0 * scale).round() as i32;
+    let (bw, bh) = (size.width as i32, size.height as i32);
+    let (ax, ay) = (area.position.x, area.position.y);
+    let (aw, ah) = (area.size.width as i32, area.size.height as i32);
+    let y = if bottom + gap + bh <= ay + ah {
+        bottom + gap
+    } else if top - gap - bh >= ay {
+        top - gap - bh
+    } else {
+        return None;
+    };
+    let x = ((left + right) / 2 - bw / 2).clamp(ax, (ax + aw - bw).max(ax));
+    Some(tauri::PhysicalPosition::new(x, y))
 }
 
 fn close_bar(app: &AppHandle) {

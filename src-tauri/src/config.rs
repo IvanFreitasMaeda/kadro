@@ -41,6 +41,10 @@ pub struct Config {
     /// Set once launch at login was turned on by default (or changed by hand), so it
     /// is never forced back on after the user turns it off.
     pub autostart_initialized: bool,
+    /// Linux on Wayland: the screen cast portal's token for the screen shared last
+    /// time, so recording doesn't ask which screen every time.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub screencast_token: Option<String>,
 }
 
 pub struct ConfigState(pub Mutex<Config>);

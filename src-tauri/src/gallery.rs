@@ -62,7 +62,9 @@ fn open(app: &AppHandle) -> Result<(), String> {
     let builder = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("gallery.html".into()))
         .title("Histórico do Kadro")
         .decorations(false)
-        .resizable(false)
+        // GTK can't shrink a fixed-size window below its first size (800x600):
+        // Linux keeps it resizable, which without decorations changes nothing visible.
+        .resizable(cfg!(target_os = "linux"))
         .maximizable(false)
         .minimizable(false)
         .always_on_top(true)

@@ -1,0 +1,38 @@
+# Maintainer: Ivan Freitas Maeda <https://github.com/IvanFreitasMaeda>
+#
+# Repackages the .deb published on the GitHub release. To update for a new
+# version: change pkgver, run `updpkgsums` and `makepkg --printsrcinfo > .SRCINFO`.
+
+pkgname=kadro-bin
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Captura de tela, anotações, gravação em MP4/GIF, OCR e histórico da área de transferência"
+arch=('x86_64' 'aarch64')
+url="https://github.com/IvanFreitasMaeda/kadro"
+license=('MIT')
+depends=('webkit2gtk-4.1' 'gtk3' 'libayatana-appindicator' 'libpipewire' 'libxcb' 'xdg-desktop-portal')
+optdepends=(
+  'tesseract: copiar o texto das capturas (OCR)'
+  'tesseract-data-por: OCR em português'
+  'tesseract-data-eng: OCR em inglês'
+  'xdg-desktop-portal-gnome: capturas e gravação no GNOME Wayland'
+  'xdg-desktop-portal-kde: capturas e gravação no KDE Wayland'
+  'xdg-desktop-portal-wlr: capturas e gravação no sway e outros wlroots'
+  'xdg-desktop-portal-hyprland: capturas e gravação no Hyprland'
+)
+provides=('kadro')
+conflicts=('kadro')
+options=('!strip' '!debug')
+source=("LICENSE-${pkgver}::https://raw.githubusercontent.com/IvanFreitasMaeda/kadro/v${pkgver}/LICENSE")
+source_x86_64=("kadro-${pkgver}-x86_64.deb::https://github.com/IvanFreitasMaeda/kadro/releases/download/v${pkgver}/Kadro-Linux-x86_64.deb")
+source_aarch64=("kadro-${pkgver}-aarch64.deb::https://github.com/IvanFreitasMaeda/kadro/releases/download/v${pkgver}/Kadro-Linux-arm64.deb")
+sha256sums=('SKIP')
+sha256sums_x86_64=('SKIP')
+sha256sums_aarch64=('SKIP')
+
+package() {
+  mkdir -p "${srcdir}/deb"
+  bsdtar -xf "${srcdir}/kadro-${pkgver}-${CARCH}.deb" -C "${srcdir}/deb"
+  bsdtar -xf "${srcdir}"/deb/data.tar.* -C "${pkgdir}"
+  install -Dm644 "${srcdir}/LICENSE-${pkgver}" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}

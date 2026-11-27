@@ -88,22 +88,74 @@ pub fn plugin() -> tauri::plugin::TauriPlugin<Wry> {
                 return;
             }
             let app = app.app_handle();
-            match kind_of(app, shortcut) {
-                Some(Kind::Gallery) => gallery::toggle(app),
-                Some(Kind::Record) => record::toggle(app),
-                Some(Kind::Full) => capture::start(app, true),
-                Some(Kind::Text) => capture::start_text(app),
-                Some(Kind::Clipboard) => clipboard::toggle(app),
-                Some(Kind::Draw) => record::draw::toggle(app),
-                _ => capture::start(app, false),
+            let kind = kind_of(app, shortcut).unwrap_or(Kind::Area);
+            // Linux calls this on the X11 key-grab thread, and an action that
+            // registers or drops a shortcut (stopping a recording drops the draw
+            // one) would wait on that same thread forever. Run it elsewhere.
+            if cfg!(target_os = "linux") {
+                let app = app.clone();
+                std::thread::spawn(move || run(&app, kind));
+            } else {
+                run(app, kind);
             }
         })
         .build()
 }
 
+/// Does what a shortcut's action does.
+pub fn run(app: &AppHandle, kind: Kind) {
+    match kind {
+        Kind::Gallery => gallery::toggle(app),
+        Kind::Record => record::toggle(app),
+        Kind::Full => capture::start(app, true),
+        Kind::Text => capture::start_text(app),
+        Kind::Clipboard => clipboard::toggle(app),
+        Kind::Draw => record::draw::toggle(app),
+        Kind::Area => capture::start(app, false),
+    }
+}
+
+/// The action named on the command line (`kadro --area`, `--full`, `--record`,
+/// `--text`, `--gallery`, `--clipboard`, `--draw`), if any. Lets the shortcuts be set
+/// in the system's own settings where Kadro can't register them (Wayland without the
+/// shortcuts portal), or from scripts.
+pub fn kind_from_args<S: AsRef<str>>(args: &[S]) -> Option<Kind> {
+    args.iter().skip(1).find_map(|arg| match arg.as_ref() {
+        "--area" | "--capture" => Some(Kind::Area),
+        "--full" => Some(Kind::Full),
+        "--record" => Some(Kind::Record),
+        "--text" | "--ocr" => Some(Kind::Text),
+        "--gallery" | "--history" => Some(Kind::Gallery),
+        "--clipboard" => Some(Kind::Clipboard),
+        "--draw" => Some(Kind::Draw),
+        _ => None,
+    })
+}
+
+/// Wayland: the X11 key grabs Kadro's windows get through XWayland only work while
+/// one of them has the focus, so the shortcuts go through the portal instead.
+fn use_portal() -> bool {
+    cfg!(target_os = "linux") && is_wayland()
+}
+
+#[cfg(target_os = "linux")]
+fn is_wayland() -> bool {
+    crate::linux::is_wayland()
+}
+
+#[cfg(not(target_os = "linux"))]
+fn is_wayland() -> bool {
+    false
+}
+
 /// Registers the configured shortcuts. Failures are logged: another app may own the
 /// combination, and the tray icon still works.
 pub fn register_all(app: &AppHandle) {
+    if use_portal() {
+        #[cfg(target_os = "linux")]
+        crate::linux::shortcuts::bind(app);
+        return;
+    }
     for kind in ALL {
         if kind == Kind::Draw && !record::is_recording(app) {
             continue;
@@ -117,6 +169,9 @@ pub fn register_all(app: &AppHandle) {
 
 /// Registers (`true`) or drops the draw shortcut when a recording starts or stops.
 pub fn set_draw(app: &AppHandle, on: bool) {
+    if use_portal() {
+        return;
+    }
     let accelerator = current(app, Kind::Draw);
     let result = if on {
         app.global_shortcut().register(accelerator.as_str())
@@ -131,6 +186,9 @@ pub fn set_draw(app: &AppHandle, on: bool) {
 /// Turns the shortcuts off while the user records a new one, so pressing the old
 /// combination doesn't start a capture.
 pub fn unregister_all(app: &AppHandle) {
+    if use_portal() {
+        return;
+    }
     if let Err(err) = app.global_shortcut().unregister_all() {
         log::warn!("could not unregister shortcuts: {err}");
     }
@@ -147,15 +205,17 @@ pub fn set(app: &AppHandle, kind: Kind, accelerator: Option<String>) -> Result<S
     }
 
     // Try the new combination before saving it: the OS refuses ones that another
-    // app already owns.
-    unregister_all(app);
-    if let Err(err) = app.global_shortcut().register(parsed) {
-        register_all(app);
-        return Err(format!(
-            "Não foi possível usar esse atalho. Talvez outro app já use ({err})."
-        ));
+    // app already owns. (Through the portal, the desktop decides when binding.)
+    if !use_portal() {
+        unregister_all(app);
+        if let Err(err) = app.global_shortcut().register(parsed) {
+            register_all(app);
+            return Err(format!(
+                "Não foi possível usar esse atalho. Talvez outro app já use ({err})."
+            ));
+        }
+        let _ = app.global_shortcut().unregister(parsed);
     }
-    let _ = app.global_shortcut().unregister(parsed);
 
     {
         let state = app.state::<config::ConfigState>();

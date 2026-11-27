@@ -121,10 +121,45 @@ fn open_overlays(app: &AppHandle, mode: Mode) -> Result<(), String> {
     let monitors = xcap::Monitor::all().map_err(|e| e.to_string())?;
     let screens = app.available_monitors().map_err(|e| e.to_string())?;
 
+    // Wayland: one portal screenshot of the whole desktop, cut per monitor.
+    #[cfg(target_os = "linux")]
+    let mut portal_shots = if crate::linux::is_wayland() {
+        let areas: Vec<(i32, i32, u32, u32)> = monitors
+            .iter()
+            .map(|m| {
+                (
+                    m.x().unwrap_or(0),
+                    m.y().unwrap_or(0),
+                    m.width().unwrap_or(1),
+                    m.height().unwrap_or(1),
+                )
+            })
+            .collect();
+        match crate::linux::screenshot::desktop() {
+            Ok(desktop) => crate::linux::screenshot::split(&desktop, &areas)
+                .into_iter()
+                .map(Some)
+                .collect(),
+            Err(err) => {
+                log::warn!("portal screenshot failed, trying per monitor: {err}");
+                Vec::new()
+            }
+        }
+    } else {
+        Vec::new()
+    };
+
     let mut shots = Vec::with_capacity(monitors.len());
     let mut placements = Vec::with_capacity(monitors.len());
     for (i, monitor) in monitors.iter().enumerate() {
-        let image = monitor.capture_image().map_err(|e| e.to_string())?;
+        #[cfg(target_os = "linux")]
+        let ready = portal_shots.get_mut(i).and_then(Option::take);
+        #[cfg(not(target_os = "linux"))]
+        let ready: Option<RgbaImage> = None;
+        let image = match ready {
+            Some(image) => image,
+            None => monitor.capture_image().map_err(|e| e.to_string())?,
+        };
         placements.push(placement(monitor, &screens, i, &image));
         shots.push(image);
     }
@@ -200,6 +235,10 @@ fn open_overlays(app: &AppHandle, mode: Mode) -> Result<(), String> {
             window.set_size(size).map_err(|e| e.to_string())?;
             window.set_position(pos).map_err(|e| e.to_string())?;
             window.set_size(size).map_err(|e| e.to_string())?;
+            // Linux: full screen on that monitor, or the window manager keeps the
+            // window below the top bar and the panels.
+            #[cfg(target_os = "linux")]
+            window.set_fullscreen(true).map_err(|e| e.to_string())?;
         }
 
         #[cfg(target_os = "macos")]

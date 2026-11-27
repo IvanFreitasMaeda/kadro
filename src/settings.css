@@ -134,3 +134,8 @@ input[type="checkbox"] {
 
 button.danger { color: #fff; background: var(--error); border-color: var(--error); }
 select:disabled { opacity: 0.5; }
+
+.note { margin: 10px 0 2px; padding: 8px 10px; border-radius: 8px; background: var(--hover, rgba(127, 127, 127, 0.12)); color: var(--muted); font-size: 12px; line-height: 1.45; }
+.note p { margin: 0 0 6px; }
+.note code { font-size: 11px; user-select: all; -webkit-user-select: all; }
+.note ul { margin: 0; padding-left: 16px; }
