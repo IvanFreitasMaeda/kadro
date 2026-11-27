@@ -9,6 +9,7 @@
 // Linux builds (development only) have no backend, so the frame plumbing is unused.
 #![cfg_attr(not(any(target_os = "macos", target_os = "windows")), allow(dead_code))]
 
+pub mod draw;
 mod gif;
 #[cfg(target_os = "macos")]
 mod macos;
@@ -27,7 +28,7 @@ use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindo
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use tauri_plugin_opener::OpenerExt;
 
-use crate::{capture, config, gallery, history, tray};
+use crate::{capture, config, gallery, history, shortcuts, tray};
 
 #[cfg(target_os = "macos")]
 use macos as platform;
@@ -36,7 +37,7 @@ use windows as platform;
 
 /// The control bar shown while recording.
 pub const BAR_LABEL: &str = "recorder";
-const BAR_WIDTH: f64 = 232.0;
+const BAR_WIDTH: f64 = 272.0;
 const BAR_HEIGHT: f64 = 44.0;
 /// Gap between the bar and the bottom of the screen, in logical pixels.
 const BAR_MARGIN: f64 = 72.0;
@@ -207,7 +208,7 @@ pub fn is_busy(app: &AppHandle) -> bool {
     !matches!(*app.state::<RecordState>().0.lock().unwrap(), Phase::Idle)
 }
 
-fn is_recording(app: &AppHandle) -> bool {
+pub fn is_recording(app: &AppHandle) -> bool {
     matches!(
         *app.state::<RecordState>().0.lock().unwrap(),
         Phase::Recording(_)
@@ -366,6 +367,10 @@ fn begin(app: &AppHandle, target: Target) {
 
     match start_backend(&target, feed.clone()) {
         Ok(backend) => {
+            // Created now, after capturing started, so the macOS recording keeps it in.
+            if let Err(err) = draw::open(app, &target) {
+                log::error!("could not open the draw overlay: {err}");
+            }
             *app.state::<RecordState>().0.lock().unwrap() = Phase::Recording(Box::new(Active {
                 backend,
                 gif,
@@ -375,6 +380,8 @@ fn begin(app: &AppHandle, target: Target) {
                 size: target.size,
                 started: Instant::now(),
             }));
+            // The draw shortcut only exists while recording.
+            shortcuts::set_draw(app, true);
             let _ = app.emit_to(BAR_LABEL, "recording-started", ());
             tray::set_recording(app, true);
         }
@@ -394,6 +401,7 @@ fn begin(app: &AppHandle, target: Target) {
 }
 
 fn fail(app: &AppHandle, path: &std::path::Path, err: String) {
+    draw::close(app);
     close_bar(app);
     let _ = std::fs::remove_file(path);
     *app.state::<RecordState>().0.lock().unwrap() = Phase::Idle;
@@ -414,6 +422,8 @@ pub fn stop(app: &AppHandle, discard: bool) {
             }
         }
     };
+    draw::close(app);
+    shortcuts::set_draw(app, false);
     let app = app.clone();
     std::thread::spawn(move || {
         let _ = app.emit_to(BAR_LABEL, "recording-stopping", ());
@@ -543,6 +553,9 @@ fn open_bar(app: &AppHandle, format: Format) -> Result<(), String> {
 
     #[cfg(target_os = "windows")]
     windows::exclude_from_capture(&window);
+    // Above the draw overlay, so it can be clicked while drawing.
+    #[cfg(target_os = "macos")]
+    draw::set_level(&window, draw::BAR_LEVEL);
 
     window.show().map_err(|e| e.to_string())?;
     Ok(())

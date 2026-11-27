@@ -11,7 +11,10 @@ use image::{imageops, RgbaImage};
 use windows::Win32::{
     Foundation::{HWND, POINT},
     Graphics::Gdi::{MonitorFromPoint, MONITOR_DEFAULTTONEAREST},
-    UI::WindowsAndMessaging::{SetWindowDisplayAffinity, WDA_EXCLUDEFROMCAPTURE},
+    UI::WindowsAndMessaging::{
+        SetWindowDisplayAffinity, SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE,
+        SWP_NOSIZE, WDA_EXCLUDEFROMCAPTURE,
+    },
 };
 use windows_capture::{
     capture::{CaptureControl, Context, GraphicsCaptureApiHandler},
@@ -36,6 +39,18 @@ pub fn exclude_from_capture(window: &tauri::WebviewWindow) {
         let hwnd = HWND(hwnd.0 as *mut _);
         if let Err(err) = unsafe { SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE) } {
             log::warn!("SetWindowDisplayAffinity: {err}");
+        }
+    }
+}
+
+/// Puts a topmost window (the recording bar) back above the other topmost ones, such
+/// as the draw overlay after it took the focus.
+pub fn bring_to_top(window: &tauri::WebviewWindow) {
+    if let Ok(hwnd) = window.hwnd() {
+        let hwnd = HWND(hwnd.0 as *mut _);
+        let flags = SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE;
+        if let Err(err) = unsafe { SetWindowPos(hwnd, Some(HWND_TOPMOST), 0, 0, 0, 0, flags) } {
+            log::warn!("SetWindowPos: {err}");
         }
     }
 }

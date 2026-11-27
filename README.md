@@ -30,6 +30,7 @@ Macs com processador Intel não são suportados. Depois de baixar, veja [Instala
 - **Copie o texto** que aparece na captura: o Kadro reconhece o texto (OCR) e você seleciona só o trecho que quer, ou copia tudo. Também tem um atalho que copia direto o texto de uma área. Usa o OCR do próprio sistema (Vision no macOS, Windows.Media.Ocr no Windows), então funciona offline e não aumenta o app. Lê português e inglês.
 - Histórico na lateral: as últimas capturas aparecem em miniatura, e um clique copia de novo. Dá para salvar, abrir ou remover cada uma dali.
 - Grave a tela inteira ou uma área em **MP4** ou **GIF**. Uma barrinha mostra o tempo e o botão de parar, e fica de fora do vídeo. A gravação vai para a pasta de capturas e aparece no histórico.
+- **Desenhe na tela enquanto grava**: com um atalho (ou o lápis na barrinha) dá para riscar, marcar, fazer setas e retângulos por cima da área gravada, e os desenhos saem no vídeo/GIF. Fora do modo desenho os cliques passam direto para os apps. Opcionalmente os traços somem sozinhos depois de 3 segundos.
 - **Histórico da área de transferência**, como o Win+V do Windows: um atalho abre uma janelinha perto do mouse com tudo que você copiou (textos, links, imagens e arquivos), do mais novo para o mais antigo. Busque digitando, fixe os que usa sempre e escolha um para copiar de novo. Fica separado do histórico de capturas, com pasta e limites próprios (padrão: últimos 100 itens por 30 dias). Ignora o que gerenciadores de senha marcam como sigiloso.
 - Atalhos, pasta de capturas e tamanho dos históricos configuráveis em Preferências.
 - Funciona com vários monitores.
@@ -75,6 +76,21 @@ Na gravação:
 | `V` · `G` | Vídeo MP4 · GIF animado |
 | `Enter` ou duplo clique | Começar a gravar |
 | `⌘ ⇧ 9` / `Ctrl Shift 9`, ou clique no ícone do Kadro | Parar e salvar |
+| `⌘ ⇧ D` / `Ctrl Shift D`, ou o lápis na barrinha | Ligar/desligar o modo desenho |
+
+No modo desenho:
+
+| Tecla | Ação |
+| --- | --- |
+| `P` `M` `A` `R` | Caneta, marca-texto, seta, retângulo |
+| `1`–`5` | Cor (vermelho, amarelo, verde, azul, branco) |
+| `Shift` enquanto desenha | Trava o ângulo da seta, faz quadrado |
+| `F` | Liga/desliga apagar sozinho (os traços somem após 3 s) |
+| `Ctrl/⌘ Z` | Desfazer |
+| `C` ou `Delete` | Limpar todos os desenhos |
+| `Esc` | Sair do modo desenho (os desenhos ficam na tela) |
+
+O atalho do modo desenho só existe durante a gravação, então não atrapalha outros apps no resto do tempo. Os desenhos ficam numa janela transparente por cima da área gravada e somem quando a gravação termina.
 
 O botão de lixeira na barrinha descarta a gravação (clique duas vezes). O MP4 sai em 30 quadros por segundo, na resolução da tela (até 4K). O GIF sai em 15 quadros por segundo e no tamanho "normal" da tela (sem o dobro do Retina), com no máximo 1280 px de largura, para não ficar pesado.
 
@@ -170,7 +186,8 @@ Estrutura:
 - `src/annotate.ts`: formas das anotações e como desenhá-las.
 - `src/gallery.ts`: interface do histórico.
 - `src/clipboard.ts`: interface do histórico da área de transferência.
-- `src/record.ts`: barrinha de controle da gravação.
+- `src/record.ts`: barrinha de controle da gravação (e as ferramentas do modo desenho).
+- `src/draw.ts`: janela transparente onde se desenha durante a gravação (`src-tauri/src/record/draw.rs` abre e liga/desliga).
 - `src/settings.ts`: interface das preferências.
 
 ## Apoiar o projeto

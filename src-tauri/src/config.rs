@@ -22,6 +22,9 @@ pub struct Config {
     pub shortcut_text: Option<String>,
     /// Global shortcut for the clipboard history. `None` means the default.
     pub shortcut_clipboard: Option<String>,
+    /// Global shortcut that turns drawing on the screen on and off while recording.
+    /// `None` means the default.
+    pub shortcut_draw: Option<String>,
     /// How many clipboard items are kept (pinned ones aside); 0 turns it off.
     /// `None` means the default.
     pub clip_limit: Option<usize>,
