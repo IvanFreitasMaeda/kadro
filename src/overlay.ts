@@ -2,6 +2,7 @@
 // select an area, annotate it, then copy it or save it. One overlay window exists
 // per monitor. In recording mode it picks the area and format to record instead.
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { emit, listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   COLORS,
@@ -263,6 +264,7 @@ function onPointerDown(e: PointerEvent) {
   } else {
     drag = { kind: "create", ox: e.clientX, oy: e.clientY };
     sel = { x: e.clientX, y: e.clientY, w: 0, h: 0 };
+    claimSelection();
   }
   fullScreen = false;
   document.body.setPointerCapture(e.pointerId);
@@ -817,9 +819,36 @@ async function inkPng(img: { x: number; y: number; width: number; height: number
 }
 
 function selectFullScreen() {
+  claimSelection();
   exitText();
   fullScreen = true;
   sel = { x: 0, y: 0, w: vw(), h: vh() };
+  render();
+}
+
+// ---- One selection across monitors ----
+// Copy and save use the selection of the overlay they are pressed on and then close
+// every overlay, so a selection left on another monitor would be lost silently.
+// Starting a selection on one monitor clears the others, like a single screen.
+
+const CLAIM_EVENT = "kadro://selection-claimed";
+
+function claimSelection() {
+  void emit(CLAIM_EVENT, { monitor, nonce });
+}
+
+/** Drops this overlay's selection and annotations because another monitor took over. */
+function clearSelection() {
+  cancelText();
+  exitText();
+  sel = null;
+  drag = null;
+  current = null;
+  fullScreen = false;
+  shapes = [];
+  redoStack = [];
+  updateHistoryButtons();
+  hideToast();
   render();
 }
 
@@ -1090,6 +1119,9 @@ async function init() {
   await shot.decode();
   if (startFull) selectFullScreen();
   render();
+  await listen<{ monitor: number; nonce: number }>(CLAIM_EVENT, ({ payload }) => {
+    if (payload.nonce === nonce && payload.monitor !== monitor && !busy) clearSelection();
+  });
   const win = getCurrentWindow();
   await win.show();
   if (startFocused) await win.setFocus();
